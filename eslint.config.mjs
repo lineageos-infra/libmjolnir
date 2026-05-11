@@ -11,6 +11,9 @@ export default defineConfig(
       parserOptions: {
         projectService: true
       }
+    },
+    rules: {
+      eqeqeq: 'error'
     }
   },
   {

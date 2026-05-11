@@ -54,7 +54,7 @@ export class PitEntry {
 
   matches(otherPitEntry: PitEntry): boolean {
     return (
-      otherPitEntry != undefined &&
+      otherPitEntry !== undefined &&
       this.binaryType === otherPitEntry.binaryType &&
       this.deviceType === otherPitEntry.deviceType &&
       this.identifier === otherPitEntry.identifier &&
