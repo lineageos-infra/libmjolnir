@@ -22,15 +22,15 @@ A WebUSB implementation of the Odin protocol, used for interfacing with Samsung 
 
 ## Building
 ```sh
-yarn # only needs to be run once, to install dependencies
-yarn build
+pnpm install # only needs to be run once, to install dependencies
+pnpm build
 ```
 
 ## Building the example project
 ```sh
 cd example
-yarn dev --host
+pnpm dev --host
 ```
 
 ## Unit tests
-`yarn test`
+`pnpm test`
