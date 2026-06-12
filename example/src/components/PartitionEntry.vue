@@ -1,20 +1,15 @@
 <script setup lang="ts">
-  import { type PropType, ref } from 'vue';
+  import { ref } from 'vue';
   import { libpit } from 'libmjolnir';
 
-  defineProps({
-    entry: {
-      type: Object as PropType<libpit.PitEntry>,
-      required: true
-    }
-  });
+  defineProps<{ entry: libpit.PitEntry }>();
 
   const emit = defineEmits(['flash']);
 
-  const currentFile = ref(undefined as File | undefined)
+  const currentFile = ref<File>();
 
-  function stageFile (event: any) {
-    currentFile.value = event?.target?.files?.[0];
+  function stageFile (event: Event) {
+    currentFile.value = (event.target as HTMLInputElement).files?.[0];
   }
 
   async function flashPartition (partitionName: string) {
@@ -30,19 +25,23 @@
 </script>
 
 <template>
-  <p class="pit-entry">
-    <div>partitionName: {{ entry.partitionName }}</div>
-    <div>identifier: {{ entry.identifier }}</div>
-    <div>flashFileName: {{ entry.flashFilename }}</div>
-    <div>blockSizeOrOffset: {{ entry.blockSizeOrOffset }}</div>
-    <template v-if="entry.isFlashable">
-      <input type="file" :id="`flash-${entry.identifier}`" @change="stageFile"/>
-      <button
-        :disabled="!currentFile"
-        @click="flashPartition(entry.partitionName)"
-      >
-        Flash partition
-      </button>
-    </template>
-  </p>
+  <tr>
+    <td>{{ entry.identifier }}</td>
+    <td>{{ entry.partitionName }}</td>
+    <td>{{ entry.flashFilename }}</td>
+    <td>{{ libpit.EntryDeviceType[entry.deviceType] }}</td>
+    <td>{{ entry.binaryType === libpit.EntryBinaryType.CommunicationProcessor ? 'CP' : 'AP' }}</td>
+    <td>{{ entry.blockSizeOrOffset }}</td>
+    <td>
+      <div v-if="entry.isFlashable" class="flash-cell">
+        <input type="file" :id="`flash-${entry.identifier}`" @change="stageFile"/>
+        <button
+          :disabled="!currentFile"
+          @click="flashPartition(entry.partitionName)"
+        >
+          Flash partition
+        </button>
+      </div>
+    </td>
+  </tr>
 </template>

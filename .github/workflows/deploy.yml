@@ -21,6 +21,8 @@ jobs:
           version: 11
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
+      - name: Build Library
+        run: pnpm build
       - name: Install Sample Project Dependencies
         working-directory: example
         run: pnpm install --frozen-lockfile
