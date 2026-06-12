@@ -1,3 +1,4 @@
+import { describe, expect, test } from 'vitest'
 import { ByteArray } from '../src/utils/ByteArray'
 
 describe('ByteArray', () => {

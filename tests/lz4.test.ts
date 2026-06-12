@@ -1,3 +1,4 @@
+import { describe, expect, test } from 'vitest'
 import {
   decompressLz4Block,
   decompressLz4Sequence,

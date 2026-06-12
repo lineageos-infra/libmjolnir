@@ -1,3 +1,4 @@
+import { describe, expect, test } from 'vitest'
 import { BeginSessionPacket } from '../src/packets/outbound/BeginSessionPacket'
 import { EndModemFileTransferPacket } from '../src/packets/outbound/EndModemFileTransferPacket'
 import { EndPhoneFileTransferPacket } from '../src/packets/outbound/EndPhoneFileTransferPacket'

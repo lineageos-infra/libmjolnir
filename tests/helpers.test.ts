@@ -1,26 +1,16 @@
+import { describe, expect, test, vi } from 'vitest'
 import { requestDevice } from '../src/helpers'
-import {
-  mockEmptyNavigator,
-  mockUnavailableWebUsb,
-  mockUsbDevice,
-  mockWebUsb
-} from './jest-utils/usbMocks'
 
 describe('requestDevice', () => {
-  beforeAll(() => {
-    mockEmptyNavigator()
-  })
-
   test('throws an error if browser does not support webUSB', async () => {
-    mockUnavailableWebUsb()
+    vi.stubGlobal('navigator', {})
 
     await expect(requestDevice()).rejects.toBeTruthy()
   })
 
   test('returns a device after one is connected and selected', async () => {
-    const { requestDeviceMock } = mockWebUsb()
-
-    requestDeviceMock.mockResolvedValue(mockUsbDevice())
+    const usb = { requestDevice: vi.fn().mockResolvedValue({}) }
+    vi.stubGlobal('navigator', { usb })
 
     await expect(requestDevice()).resolves.toBeTruthy()
   })
