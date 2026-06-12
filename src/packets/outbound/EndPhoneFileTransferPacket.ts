@@ -1,38 +1,45 @@
-import { EndFileTransferPacket, FileTransferDestination } from './EndFileTransferPacket';
+import { EndFileTransferPacket, FileTransferDestination } from './EndFileTransferPacket'
 
 export enum TransferFileIdentifier {
-  PrimaryBootloader          = 0x00,
-  Pit                        = 0x01, // Don't flash the pit this way!
-  SecondaryBootloader		     = 0x03,
-  SecondaryBootloaderBackup  = 0x04,
+  PrimaryBootloader = 0x00,
+  Pit = 0x01, // Don't flash the pit this way!
+  SecondaryBootloader = 0x03,
+  SecondaryBootloaderBackup = 0x04,
   // unknown file type 0x05
-  Kernel						         = 0x06,
-  Recovery					         = 0x07,
-  TabletModem				         = 0x08,
+  Kernel = 0x06,
+  Recovery = 0x07,
+  TabletModem = 0x08,
   // unknown file types 0x09 and 0x0A
-  Modem                      = 0x0B,  // Kies flashes the modem this way rather than using the EndModemFileTransferPacket.
+  Modem = 0x0b, // Kies flashes the modem this way rather than using the EndModemFileTransferPacket.
   // unkown file types 0x0C through 0x13
-  Efs                        = 0x14,
-  ParamLfs                   = 0x15,
-  FactoryFilesystem          = 0x16,
-  DatabaseData               = 0x17,
-  Cache                      = 0x18
+  Efs = 0x14,
+  ParamLfs = 0x15,
+  FactoryFilesystem = 0x16,
+  DatabaseData = 0x17,
+  Cache = 0x18
 }
 
 export class EndPhoneFileTransferPacket extends EndFileTransferPacket {
-  fileIdentifier: TransferFileIdentifier;
-  endOfFile: number;
+  fileIdentifier: TransferFileIdentifier
+  endOfFile: number
 
-  constructor(sequenceByteCount: number, binaryType: number, chipIdentifier: number, fileIdentifier: TransferFileIdentifier, endOfFile: boolean, lz4 = false) {
-    super(FileTransferDestination.Phone, sequenceByteCount, binaryType, chipIdentifier, lz4);
-    this.fileIdentifier = fileIdentifier;
-    this.endOfFile = endOfFile ? 1 : 0;
+  constructor(
+    sequenceByteCount: number,
+    binaryType: number,
+    chipIdentifier: number,
+    fileIdentifier: TransferFileIdentifier,
+    endOfFile: boolean,
+    lz4 = false
+  ) {
+    super(FileTransferDestination.Phone, sequenceByteCount, binaryType, chipIdentifier, lz4)
+    this.fileIdentifier = fileIdentifier
+    this.endOfFile = endOfFile ? 1 : 0
   }
 
-  pack () {
-    super.pack();
+  pack() {
+    super.pack()
 
-    this.packInteger(EndFileTransferPacket.dataSize, this.fileIdentifier);
-    this.packInteger(EndFileTransferPacket.dataSize + 4, this.endOfFile);
+    this.packInteger(EndFileTransferPacket.dataSize, this.fileIdentifier)
+    this.packInteger(EndFileTransferPacket.dataSize + 4, this.endOfFile)
   }
 }

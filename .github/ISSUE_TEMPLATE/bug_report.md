@@ -4,7 +4,6 @@ about: Create a report to help us improve
 title: 'bug: '
 labels: ''
 assignees: ''
-
 ---
 
 **Before continuing**
@@ -23,13 +22,15 @@ A clear and concise description of what you expected to happen.
 If applicable, add screenshots to help explain your problem.
 
 **Desktop (please complete the following information):**
- - OS: [e.g. Windows]
- - Browser [e.g. chrome, edge]
- - Version [e.g. 116]
+
+- OS: [e.g. Windows]
+- Browser [e.g. chrome, edge]
+- Version [e.g. 116]
 
 **Smartphone (please complete the following information):**
- - Device: [e.g. Galaxy S22]
- - OS: [e.g. Android 12]
+
+- Device: [e.g. Galaxy S22]
+- OS: [e.g. Android 12]
 
 **Additional context**
 Add any other context about the problem here.

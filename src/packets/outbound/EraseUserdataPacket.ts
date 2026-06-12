@@ -1,7 +1,7 @@
-import { SessionRequest, SessionSetupPacket } from './SessionSetupPacket';
+import { SessionRequest, SessionSetupPacket } from './SessionSetupPacket'
 
 export class EraseUserdataPacket extends SessionSetupPacket {
-  constructor () {
-    super(SessionRequest.EraseUserdata);
+  constructor() {
+    super(SessionRequest.EraseUserdata)
   }
 }

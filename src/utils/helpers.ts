@@ -8,9 +8,9 @@ export const timeoutPromise = <T>(promise: Promise<T>, reason: string, ms: numbe
   return Promise.race([
     promise,
     new Promise<T>((_resolve, reject) => {
-      setTimeout(() => reject(reason), ms);
+      setTimeout(() => reject(reason), ms)
     })
-  ]).catch(error => {
-    throw new Error(error);
-  });
+  ]).catch((error) => {
+    throw new Error(error)
+  })
 }

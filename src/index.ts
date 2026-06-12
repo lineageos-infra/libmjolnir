@@ -1,9 +1,9 @@
-import { DeviceOptions, OdinDevice } from './OdinDevice';
-import { requestDevice } from './helpers';
-import * as libpit from './libpit';
+import { requestDevice } from './helpers'
+import * as libpit from './libpit'
+import { DeviceOptions, OdinDevice } from './OdinDevice'
 
-export { OdinDevice, libpit, type DeviceOptions };
+export { OdinDevice, libpit, type DeviceOptions }
 
 export default {
-  requestDevice,
-};
+  requestDevice
+}

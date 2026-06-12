@@ -1,14 +1,14 @@
-import { ResponsePacket, ResponseType } from './ResponsePacket';
+import { ResponsePacket, ResponseType } from './ResponsePacket'
 
 export class PitFileResponse extends ResponsePacket {
-  fileSize = 0;
+  fileSize = 0
 
   constructor() {
-    super(ResponseType.PitFile);
+    super(ResponseType.PitFile)
   }
 
-  async unpack () {
-    await super.unpack();
-    this.fileSize = this.unpackInteger(ResponsePacket.dataSize);
+  async unpack() {
+    await super.unpack()
+    this.fileSize = this.unpackInteger(ResponsePacket.dataSize)
   }
 }

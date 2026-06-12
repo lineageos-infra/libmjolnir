@@ -1,16 +1,16 @@
-import { PitFilePacket, PitFileRequest } from './PitFilePacket';
+import { PitFilePacket, PitFileRequest } from './PitFilePacket'
 
 export class DumpPartPitFilePacket extends PitFilePacket {
-  partIndex: number;
+  partIndex: number
 
-  constructor (partIndex: number) {
-    super(PitFileRequest.Part);
-    this.partIndex = partIndex;
+  constructor(partIndex: number) {
+    super(PitFileRequest.Part)
+    this.partIndex = partIndex
   }
 
   pack() {
-    super.pack();
+    super.pack()
 
-    this.packInteger(PitFilePacket.dataSize, this.partIndex);
+    this.packInteger(PitFilePacket.dataSize, this.partIndex)
   }
 }

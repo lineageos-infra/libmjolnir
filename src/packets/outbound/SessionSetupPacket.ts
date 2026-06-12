@@ -1,4 +1,4 @@
-import { ControlPacket, ControlType } from './ControlPacket';
+import { ControlPacket, ControlType } from './ControlPacket'
 
 export enum SessionRequest {
   BeginSession = 0,
@@ -11,18 +11,20 @@ export enum SessionRequest {
 }
 
 export class SessionSetupPacket extends ControlPacket {
-  request: SessionRequest;
+  request: SessionRequest
 
   constructor(request: SessionRequest) {
-    super(ControlType.Session);
+    super(ControlType.Session)
 
-    this.request = request;
+    this.request = request
   }
 
-  static get dataSize () { return super.dataSize + 4 }
+  static get dataSize() {
+    return super.dataSize + 4
+  }
 
-  pack () {
-    super.pack();
+  pack() {
+    super.pack()
     this.packInteger(ControlPacket.dataSize, this.request)
   }
 }

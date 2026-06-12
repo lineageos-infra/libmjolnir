@@ -1,11 +1,11 @@
 export class BasePacket {
-  size: number;
-  data: Uint8Array<ArrayBuffer>;
-  _buffer: ArrayBuffer;
+  size: number
+  data: Uint8Array<ArrayBuffer>
+  _buffer: ArrayBuffer
 
   constructor(size: number) {
-    this.size = size;
-    this._buffer = new ArrayBuffer(size);
-    this.data = new Uint8Array(this._buffer);
+    this.size = size
+    this._buffer = new ArrayBuffer(size)
+    this.data = new Uint8Array(this._buffer)
   }
 }

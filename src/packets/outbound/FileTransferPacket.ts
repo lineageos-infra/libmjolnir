@@ -1,4 +1,4 @@
-import { ControlPacket, ControlType } from './ControlPacket';
+import { ControlPacket, ControlType } from './ControlPacket'
 
 export enum FileTransferRequest {
   Flash = 0x00,
@@ -11,17 +11,19 @@ export enum FileTransferRequest {
 }
 
 export class FileTransferPacket extends ControlPacket {
-  request: FileTransferRequest;
+  request: FileTransferRequest
 
-  constructor (request: FileTransferRequest) {
-    super(ControlType.FileTransfer);
-    this.request = request;
+  constructor(request: FileTransferRequest) {
+    super(ControlType.FileTransfer)
+    this.request = request
   }
 
-  static get dataSize () { return super.dataSize + 4 }
+  static get dataSize() {
+    return super.dataSize + 4
+  }
 
-  pack () {
-    super.pack();
-    this.packInteger(ControlPacket.dataSize, this.request);
+  pack() {
+    super.pack()
+    this.packInteger(ControlPacket.dataSize, this.request)
   }
 }

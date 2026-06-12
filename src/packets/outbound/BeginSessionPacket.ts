@@ -1,15 +1,17 @@
-import { SessionRequest, SessionSetupPacket } from './SessionSetupPacket';
+import { SessionRequest, SessionSetupPacket } from './SessionSetupPacket'
 
 export class BeginSessionPacket extends SessionSetupPacket {
-  constructor () {
-    super(SessionRequest.BeginSession);
+  constructor() {
+    super(SessionRequest.BeginSession)
   }
 
-  static get dataSize () { return super.dataSize + 4; }
+  static get dataSize() {
+    return super.dataSize + 4
+  }
 
   pack() {
-    super.pack();
+    super.pack()
     // Odin protocol version
-    this.packInteger(SessionSetupPacket.dataSize, 0x4);
+    this.packInteger(SessionSetupPacket.dataSize, 0x4)
   }
 }

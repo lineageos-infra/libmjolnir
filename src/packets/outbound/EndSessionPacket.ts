@@ -1,4 +1,4 @@
-import { ControlPacket, ControlType } from './ControlPacket';
+import { ControlPacket, ControlType } from './ControlPacket'
 
 export enum EndSessionRequest {
   EndSession = 0,
@@ -6,16 +6,16 @@ export enum EndSessionRequest {
 }
 
 export class EndSessionPacket extends ControlPacket {
-  request: EndSessionRequest;
+  request: EndSessionRequest
 
-  constructor (request: EndSessionRequest) {
-    super(ControlType.EndSession);
-    this.request = request;
+  constructor(request: EndSessionRequest) {
+    super(ControlType.EndSession)
+    this.request = request
   }
 
   pack() {
-    super.pack();
+    super.pack()
 
-    this.packInteger(ControlPacket.dataSize, this.request);
+    this.packInteger(ControlPacket.dataSize, this.request)
   }
 }

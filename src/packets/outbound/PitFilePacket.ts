@@ -1,4 +1,4 @@
-import { ControlPacket, ControlType } from './ControlPacket';
+import { ControlPacket, ControlType } from './ControlPacket'
 
 export enum PitFileRequest {
   Flash = 0x00,
@@ -8,17 +8,19 @@ export enum PitFileRequest {
 }
 
 export class PitFilePacket extends ControlPacket {
-  request: PitFileRequest;
+  request: PitFileRequest
 
   constructor(request: PitFileRequest) {
-    super(ControlType.PitFile);
-    this.request = request;
+    super(ControlType.PitFile)
+    this.request = request
   }
 
-  static get dataSize () { return super.dataSize + 4 }
+  static get dataSize() {
+    return super.dataSize + 4
+  }
 
-  pack () {
-    super.pack();
-    this.packInteger(ControlPacket.dataSize, this.request);
+  pack() {
+    super.pack()
+    this.packInteger(ControlPacket.dataSize, this.request)
   }
 }

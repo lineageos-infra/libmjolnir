@@ -1,9 +1,4 @@
-import { PitData } from './PitData';
-import { PitEntry, EntryBinaryType, EntryDeviceType } from './PitEntry';
+import { PitData } from './PitData'
+import { EntryBinaryType, EntryDeviceType, PitEntry } from './PitEntry'
 
-export {
-  PitData,
-  PitEntry,
-  EntryBinaryType,
-  EntryDeviceType
-};
+export { PitData, PitEntry, EntryBinaryType, EntryDeviceType }

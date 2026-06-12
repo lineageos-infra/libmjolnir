@@ -1,7 +1,7 @@
-import { SessionRequest, SessionSetupPacket } from './SessionSetupPacket';
+import { SessionRequest, SessionSetupPacket } from './SessionSetupPacket'
 
 export class DeviceTypePacket extends SessionSetupPacket {
-  constructor () {
+  constructor() {
     super(SessionRequest.DeviceType)
   }
 }

@@ -1,4 +1,4 @@
-import { InboundPacket } from './InboundPacket';
+import { InboundPacket } from './InboundPacket'
 
 export enum ResponseType {
   SendFilePart = 0x00,
@@ -9,19 +9,21 @@ export enum ResponseType {
 }
 
 export class ResponsePacket extends InboundPacket {
-  responseType: ResponseType;
+  responseType: ResponseType
 
-  constructor (responseType: ResponseType) {
-    super(8);
-    this.responseType = responseType;
+  constructor(responseType: ResponseType) {
+    super(8)
+    this.responseType = responseType
   }
 
-  static get dataSize () { return 4; }
+  static get dataSize() {
+    return 4
+  }
 
-  async unpack () {
-    const receivedResponseType = this.unpackInteger(0);
+  async unpack() {
+    const receivedResponseType = this.unpackInteger(0)
     if (receivedResponseType != this.responseType) {
-      this.responseType = receivedResponseType;
+      this.responseType = receivedResponseType
       throw new Error('requested and received response types differ')
     }
   }

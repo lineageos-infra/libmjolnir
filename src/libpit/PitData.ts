@@ -1,94 +1,101 @@
-import { ByteArray } from '../utils/ByteArray';
-import { PitEntry } from './PitEntry';
-import { constants } from './constants';
+import { ByteArray } from '../utils/ByteArray'
+import { constants } from './constants'
+import { PitEntry } from './PitEntry'
 
 export class PitData {
-  _fileType = new Uint8Array(8);
-  _boardType = new Uint8Array(8);
-  entryCount = 0;
-  entries: PitEntry[] = [];
-  lunCount = 0;
+  _fileType = new Uint8Array(8)
+  _boardType = new Uint8Array(8)
+  entryCount = 0
+  entries: PitEntry[] = []
+  lunCount = 0
 
-  matches (otherPitData: PitData) {
-    return this.entryCount === otherPitData.entryCount &&
+  matches(otherPitData: PitData) {
+    return (
+      this.entryCount === otherPitData.entryCount &&
       this.fileType === otherPitData.fileType &&
       this.boardType === otherPitData.boardType &&
       this.lunCount === otherPitData.lunCount &&
-      this.entries.every((entry, index) => entry.matches(otherPitData.entries[index]!));
+      this.entries.every((entry, index) => entry.matches(otherPitData.entries[index]!))
+    )
   }
 
-  clear () {
-    this._fileType = new Uint8Array(8);
-    this._boardType = new Uint8Array(8);
-    this.lunCount = 0;
-    this.entryCount = 0;
-    this.entries = [];
+  clear() {
+    this._fileType = new Uint8Array(8)
+    this._boardType = new Uint8Array(8)
+    this.lunCount = 0
+    this.entryCount = 0
+    this.entries = []
   }
 
-  getDataSize () {
-    return constants.HeaderDataSize + this.entries.length * constants.EntryDataSize;
+  getDataSize() {
+    return constants.HeaderDataSize + this.entries.length * constants.EntryDataSize
   }
 
-  getPaddedSize () {
-    const dataSize = this.getDataSize();
-    let paddedSize = (dataSize / constants.PaddedSizeMultiplicand) * constants.PaddedSizeMultiplicand;
+  getPaddedSize() {
+    const dataSize = this.getDataSize()
+    let paddedSize =
+      (dataSize / constants.PaddedSizeMultiplicand) * constants.PaddedSizeMultiplicand
 
     if (dataSize % constants.PaddedSizeMultiplicand !== 0)
-      paddedSize += constants.PaddedSizeMultiplicand;
+      paddedSize += constants.PaddedSizeMultiplicand
 
-    return paddedSize;
+    return paddedSize
   }
 
-  unpackInteger (data: Uint8Array, offset: number) {
-    return data[offset]! | (data[offset + 1]! << 8) |
-      (data[offset + 2]! << 16) | (data[offset + 3]! << 24);
+  unpackInteger(data: Uint8Array, offset: number) {
+    return (
+      data[offset]! |
+      (data[offset + 1]! << 8) |
+      (data[offset + 2]! << 16) |
+      (data[offset + 3]! << 24)
+    )
   }
 
-  packInteger (data: Uint8Array, offset: number, value: number) {
-    data[offset] = value & 0x000000FF;
-    data[offset + 1] = (value & 0x0000FF00) >> 8;
-    data[offset + 2] = (value & 0x00FF0000) >> 16;
-    data[offset + 3] = (value & 0xFF000000) >> 24;
+  packInteger(data: Uint8Array, offset: number, value: number) {
+    data[offset] = value & 0x000000ff
+    data[offset + 1] = (value & 0x0000ff00) >> 8
+    data[offset + 2] = (value & 0x00ff0000) >> 16
+    data[offset + 3] = (value & 0xff000000) >> 24
   }
 
-  unpackShort (data: Uint8Array, offset: number) {
-    return data[offset]! | (data[offset + 1]! << 8);
+  unpackShort(data: Uint8Array, offset: number) {
+    return data[offset]! | (data[offset + 1]! << 8)
   }
 
-  packShort (data: Uint8Array, offset: number, value: number) {
-    data[offset] = value & 0x00FF;
-    data[offset + 1] = (value & 0xFF00) >> 8;
+  packShort(data: Uint8Array, offset: number, value: number) {
+    data[offset] = value & 0x00ff
+    data[offset + 1] = (value & 0xff00) >> 8
   }
 
-  unpackCharArray (data: Uint8Array, offset: number, length: number) : Uint8Array<ArrayBuffer> {
-    return data.slice(offset, offset + length);
+  unpackCharArray(data: Uint8Array, offset: number, length: number): Uint8Array<ArrayBuffer> {
+    return data.slice(offset, offset + length)
   }
 
-  packCharArray (data: Uint8Array, offset: number, value: Uint8Array) {
-    data.set(value, offset);
+  packCharArray(data: Uint8Array, offset: number, value: Uint8Array) {
+    data.set(value, offset)
   }
 
-  unpack (data: Uint8Array) : boolean {
+  unpack(data: Uint8Array): boolean {
     if (this.unpackInteger(data, 0) !== constants.FileIdentifier) {
-      return false;
+      return false
     }
 
     // Remove existing entries
-    this.entries = [];
+    this.entries = []
 
-    this.entryCount = this.unpackInteger(data, 4);
+    this.entryCount = this.unpackInteger(data, 4)
 
-    this.entries = new Array(this.entryCount);
+    this.entries = new Array(this.entryCount)
 
-    this._fileType = this.unpackCharArray(data, 8, 8);
-    this._boardType = this.unpackCharArray(data, 16, 8);
+    this._fileType = this.unpackCharArray(data, 8, 8)
+    this._boardType = this.unpackCharArray(data, 16, 8)
 
-    this.lunCount = this.unpackShort(data, 24);
+    this.lunCount = this.unpackShort(data, 24)
 
-    let entryOffset: number;
+    let entryOffset: number
 
     for (let i = 0; i < this.entryCount; i++) {
-      entryOffset = constants.HeaderDataSize + i * constants.EntryDataSize;
+      entryOffset = constants.HeaderDataSize + i * constants.EntryDataSize
 
       this.entries[i] = new PitEntry({
         binaryType: this.unpackInteger(data, entryOffset),
@@ -101,80 +108,98 @@ export class PitData {
         fileOffset: this.unpackInteger(data, entryOffset + 28),
         fileSize: this.unpackInteger(data, entryOffset + 32),
 
-        _partitionName: this.unpackCharArray(data, 
-          entryOffset + 36, constants.PartitionNameMaxLength),
-        _flashFilename: this.unpackCharArray(data, 
-          entryOffset + 36 + constants.PartitionNameMaxLength, constants.FlashFilenameMaxLength),
-        _fotaFilename: this.unpackCharArray(data, 
-          entryOffset + 36 + constants.PartitionNameMaxLength + constants.FlashFilenameMaxLength, 
-          constants.FotaFilenameMaxLength)
-      });
+        _partitionName: this.unpackCharArray(
+          data,
+          entryOffset + 36,
+          constants.PartitionNameMaxLength
+        ),
+        _flashFilename: this.unpackCharArray(
+          data,
+          entryOffset + 36 + constants.PartitionNameMaxLength,
+          constants.FlashFilenameMaxLength
+        ),
+        _fotaFilename: this.unpackCharArray(
+          data,
+          entryOffset + 36 + constants.PartitionNameMaxLength + constants.FlashFilenameMaxLength,
+          constants.FotaFilenameMaxLength
+        )
+      })
     }
 
-    return true;
+    return true
   }
 
-  pack (data: Uint8Array) {
-    this.packInteger(data, 0, constants.FileIdentifier);
-    this.packInteger(data, 4, this.entryCount);
+  pack(data: Uint8Array) {
+    this.packInteger(data, 0, constants.FileIdentifier)
+    this.packInteger(data, 4, this.entryCount)
 
-    this.packCharArray(data, 8, this._fileType);
-    this.packCharArray(data, 16, this._boardType);
+    this.packCharArray(data, 8, this._fileType)
+    this.packCharArray(data, 16, this._boardType)
 
-    this.packShort(data, 24, this.lunCount);
+    this.packShort(data, 24, this.lunCount)
 
-    let entryOffset: number;
+    let entryOffset: number
 
     for (let i = 0; i < this.entryCount; i++) {
-      entryOffset = constants.HeaderDataSize + i * constants.EntryDataSize;
+      entryOffset = constants.HeaderDataSize + i * constants.EntryDataSize
 
-      const entry = this.entries[i]!;
+      const entry = this.entries[i]!
 
-      this.packInteger(data, entryOffset, entry.binaryType);
+      this.packInteger(data, entryOffset, entry.binaryType)
 
-      this.packInteger(data, entryOffset + 4, entry.deviceType);
-      this.packInteger(data, entryOffset + 8, entry.identifier);
-      this.packInteger(data, entryOffset + 12, entry.attributes);
+      this.packInteger(data, entryOffset + 4, entry.deviceType)
+      this.packInteger(data, entryOffset + 8, entry.identifier)
+      this.packInteger(data, entryOffset + 12, entry.attributes)
 
-      this.packInteger(data, entryOffset + 16, entry.updateAttributes);
+      this.packInteger(data, entryOffset + 16, entry.updateAttributes)
 
-      this.packInteger(data, entryOffset + 20, entry.blockSizeOrOffset);
-      this.packInteger(data, entryOffset + 24, entry.blockCount);
+      this.packInteger(data, entryOffset + 20, entry.blockSizeOrOffset)
+      this.packInteger(data, entryOffset + 24, entry.blockCount)
 
-      this.packInteger(data, entryOffset + 28, entry.fileOffset);
-      this.packInteger(data, entryOffset + 32, entry.fileSize);
+      this.packInteger(data, entryOffset + 28, entry.fileOffset)
+      this.packInteger(data, entryOffset + 32, entry.fileSize)
 
-      this.packCharArray(data, entryOffset + 36, entry._partitionName);
-      this.packCharArray(data, entryOffset + 36 + constants.PartitionNameMaxLength, entry._flashFilename);
-      this.packCharArray(data, entryOffset + 36 + constants.PartitionNameMaxLength + constants.FlashFilenameMaxLength, entry._fotaFilename);
+      this.packCharArray(data, entryOffset + 36, entry._partitionName)
+      this.packCharArray(
+        data,
+        entryOffset + 36 + constants.PartitionNameMaxLength,
+        entry._flashFilename
+      )
+      this.packCharArray(
+        data,
+        entryOffset + 36 + constants.PartitionNameMaxLength + constants.FlashFilenameMaxLength,
+        entry._fotaFilename
+      )
     }
   }
 
   get fileType() {
-    return ByteArray.toString(this._fileType);
+    return ByteArray.toString(this._fileType)
   }
 
   set fileType(desiredType: string) {
-    this._fileType.set(ByteArray.fromString(desiredType));
+    this._fileType.set(ByteArray.fromString(desiredType))
   }
 
   get boardType() {
-    return ByteArray.toString(this._boardType);
+    return ByteArray.toString(this._boardType)
   }
 
   set boardType(desiredName: string) {
-    this._boardType.set(ByteArray.fromString(desiredName));
+    this._boardType.set(ByteArray.fromString(desiredName))
   }
 
-  getEntry (index: number) : PitEntry {
-    return this.entries[index]!;
+  getEntry(index: number): PitEntry {
+    return this.entries[index]!
   }
 
-  findEntryByName (partitionName: string) : PitEntry | undefined {
-    return this.entries.find(entry => entry.isFlashable && entry.partitionName === partitionName)
+  findEntryByName(partitionName: string): PitEntry | undefined {
+    return this.entries.find((entry) => entry.isFlashable && entry.partitionName === partitionName)
   }
 
-  findEntryByIdentifier (partitionIdentifier: number) : PitEntry | undefined {
-    return this.entries.find(entry => entry.isFlashable && entry.identifier === partitionIdentifier)
+  findEntryByIdentifier(partitionIdentifier: number): PitEntry | undefined {
+    return this.entries.find(
+      (entry) => entry.isFlashable && entry.identifier === partitionIdentifier
+    )
   }
 }

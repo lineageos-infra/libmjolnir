@@ -1,14 +1,12 @@
-import { ByteArray } from '../utils/ByteArray';
-import { constants } from './constants';
+import { ByteArray } from '../utils/ByteArray'
+import { constants } from './constants'
 
-export enum EntryBinaryType
-{
+export enum EntryBinaryType {
   ApplicationProcessor = 0,
   CommunicationProcessor = 1
 }
 
-export enum EntryDeviceType
-{
+export enum EntryDeviceType {
   OneNand = 0,
   File = 1, // FAT
   MMC = 2,
@@ -16,48 +14,47 @@ export enum EntryDeviceType
   UFS = 8
 }
 
-enum EntryAttribute
-{
+enum EntryAttribute {
   Write = 1,
   STL = 1 << 1
   // BML = 1 << 2 // ???
 }
 
-enum EntryUpdateAttribute
-{
+enum EntryUpdateAttribute {
   Fota = 1,
   Secure = 1 << 1
 }
 
 export class PitEntry {
-  binaryType: EntryBinaryType = 0;
-  deviceType: EntryDeviceType = 0;
-  identifier = 0;
-  attributes: EntryAttribute = EntryAttribute.Write;
-  updateAttributes: EntryUpdateAttribute = EntryUpdateAttribute.Fota;
+  binaryType: EntryBinaryType = 0
+  deviceType: EntryDeviceType = 0
+  identifier = 0
+  attributes: EntryAttribute = EntryAttribute.Write
+  updateAttributes: EntryUpdateAttribute = EntryUpdateAttribute.Fota
 
-  blockSizeOrOffset = 0;
-  blockCount = 0;
+  blockSizeOrOffset = 0
+  blockCount = 0
 
-  fileOffset = 0; // Obsolete
-  fileSize = 0; // Obsolete
+  fileOffset = 0 // Obsolete
+  fileSize = 0 // Obsolete
 
-  _partitionName: Uint8Array;
-  _flashFilename: Uint8Array; // USB flash filename
-  _fotaFilename: Uint8Array; // Firmware over the air
+  _partitionName: Uint8Array
+  _flashFilename: Uint8Array // USB flash filename
+  _fotaFilename: Uint8Array // Firmware over the air
 
-  constructor (entry? : Partial<PitEntry>) {
-    this._partitionName = new Uint8Array(constants.PartitionNameMaxLength);
-    this._flashFilename = new Uint8Array(constants.FlashFilenameMaxLength);
-    this._fotaFilename = new Uint8Array(constants.FotaFilenameMaxLength);
+  constructor(entry?: Partial<PitEntry>) {
+    this._partitionName = new Uint8Array(constants.PartitionNameMaxLength)
+    this._flashFilename = new Uint8Array(constants.FlashFilenameMaxLength)
+    this._fotaFilename = new Uint8Array(constants.FotaFilenameMaxLength)
 
     if (entry) {
-      Object.assign(this, entry);
+      Object.assign(this, entry)
     }
   }
-  
+
   matches(otherPitEntry: PitEntry): boolean {
-    return otherPitEntry != null &&
+    return (
+      otherPitEntry != null &&
       this.binaryType === otherPitEntry.binaryType &&
       this.deviceType === otherPitEntry.deviceType &&
       this.identifier === otherPitEntry.identifier &&
@@ -69,34 +66,35 @@ export class PitEntry {
       this.fileSize === otherPitEntry.fileSize &&
       this.partitionName === otherPitEntry.partitionName &&
       this.flashFilename === otherPitEntry.flashFilename &&
-      this.fotaFilename === otherPitEntry.fotaFilename;
+      this.fotaFilename === otherPitEntry.fotaFilename
+    )
   }
 
   get isFlashable() {
-    return !!this.partitionName.trim()?.length;
+    return !!this.partitionName.trim()?.length
   }
 
   get partitionName() {
-    return ByteArray.toString(this._partitionName);
+    return ByteArray.toString(this._partitionName)
   }
 
   set partitionName(desiredName: string) {
-    this._partitionName.set(ByteArray.fromString(desiredName));
+    this._partitionName.set(ByteArray.fromString(desiredName))
   }
 
   get flashFilename() {
-    return ByteArray.toString(this._flashFilename);
+    return ByteArray.toString(this._flashFilename)
   }
 
   set flashFilename(desiredName: string) {
-    this._flashFilename.set(ByteArray.fromString(desiredName));
+    this._flashFilename.set(ByteArray.fromString(desiredName))
   }
 
   get fotaFilename() {
-    return ByteArray.toString(this._fotaFilename);
+    return ByteArray.toString(this._fotaFilename)
   }
 
   set fotaFilename(desiredName: string) {
-    this._fotaFilename.set(ByteArray.fromString(desiredName));
+    this._fotaFilename.set(ByteArray.fromString(desiredName))
   }
 }

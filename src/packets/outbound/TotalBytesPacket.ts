@@ -1,16 +1,16 @@
-import { SessionRequest, SessionSetupPacket } from './SessionSetupPacket';
+import { SessionRequest, SessionSetupPacket } from './SessionSetupPacket'
 
 export class TotalBytesPacket extends SessionSetupPacket {
-  fileTotalSize: number;
+  fileTotalSize: number
 
-  constructor (filePartSize: number) {
-    super(SessionRequest.TotalBytes);
-    this.fileTotalSize = filePartSize;
+  constructor(filePartSize: number) {
+    super(SessionRequest.TotalBytes)
+    this.fileTotalSize = filePartSize
   }
 
-  pack () {
-    super.pack();
-    this.packInteger(SessionSetupPacket.dataSize, this.fileTotalSize);
-    this.packInteger(SessionSetupPacket.dataSize + 4, Math.floor(this.fileTotalSize / 0x100000000));
+  pack() {
+    super.pack()
+    this.packInteger(SessionSetupPacket.dataSize, this.fileTotalSize)
+    this.packInteger(SessionSetupPacket.dataSize + 4, Math.floor(this.fileTotalSize / 0x100000000))
   }
 }

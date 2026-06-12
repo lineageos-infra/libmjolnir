@@ -1,4 +1,4 @@
-import { OutboundPacket } from './OutboundPacket';
+import { OutboundPacket } from './OutboundPacket'
 
 export enum ControlType {
   Session = 0x64,
@@ -8,16 +8,18 @@ export enum ControlType {
 }
 
 export class ControlPacket extends OutboundPacket {
-  controlType: ControlType;
+  controlType: ControlType
 
-  constructor (controlType: ControlType) {
-    super(1024);
-    this.controlType = controlType;
+  constructor(controlType: ControlType) {
+    super(1024)
+    this.controlType = controlType
   }
 
-  static get dataSize () { return 4 }
+  static get dataSize() {
+    return 4
+  }
 
-  pack () {
-    this.packInteger(0, this.controlType);
+  pack() {
+    this.packInteger(0, this.controlType)
   }
 }

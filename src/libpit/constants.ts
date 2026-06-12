@@ -6,4 +6,4 @@ export const constants = {
   PartitionNameMaxLength: 32,
   FlashFilenameMaxLength: 32,
   FotaFilenameMaxLength: 32
-};
+}
