@@ -35,13 +35,20 @@
     await readPit(device);
   }
 
-  function requestDeviceAccess () {
-    libmjolnir.requestDevice({
+  function deviceOptions () {
+    return {
       logging: verboseLogging.value,
       timeout: defaultTimeout.value,
       resetOnInit: resetOnInit.value
-    })
-      .then(setupDevice);
+    };
+  }
+
+  function requestDeviceAccess () {
+    libmjolnir.requestDevice(deviceOptions()).then(setupDevice);
+  }
+
+  function requestSerialDeviceAccess () {
+    libmjolnir.requestSerialDevice(deviceOptions()).then(setupDevice);
   }
 
   function refreshPit () {
@@ -79,7 +86,10 @@
       <input type="checkbox" v-model="resetOnInit" />
     </div>
   </fieldset>
-  <button @click="requestDeviceAccess">Request device access</button>
+  <div class="connect-buttons">
+    <button @click="requestDeviceAccess">Request device access (WebUSB)</button>
+    <button @click="requestSerialDeviceAccess">Request device access (Web Serial)</button>
+  </div>
   <section v-if="connectedDevice && devicePit?.entries?.length">
     <div class="device-info">
       <span>board type: {{ devicePit.boardType }}</span>
@@ -172,6 +182,12 @@
 
   input[type='file']::file-selector-button {
     margin-right: 0.625rem;
+  }
+
+  .connect-buttons {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
   }
 
   .connection-options {

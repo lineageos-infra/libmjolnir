@@ -11,6 +11,15 @@ export const UsbConstants = {
   ]
 }
 
+export const SerialConstants = {
+  PortFilters: [
+    { usbVendorId: VENDOR_SAMSUNG, usbProductId: PRODUCT_GALAXY_S },
+    { usbVendorId: VENDOR_SAMSUNG, usbProductId: PRODUCT_GALAXY_S2 },
+    { usbVendorId: VENDOR_SAMSUNG, usbProductId: PRODUCT_DROID_CHARGE }
+  ]
+}
+
 export default {
-  UsbConstants
+  UsbConstants,
+  SerialConstants
 }

@@ -20,8 +20,9 @@ import { OutboundPacket } from './packets/outbound/OutboundPacket'
 import { PitFilePacket, PitFileRequest } from './packets/outbound/PitFilePacket'
 import { SendFilePartPacket } from './packets/outbound/SendFilePartPacket'
 import { TotalBytesPacket } from './packets/outbound/TotalBytesPacket'
+import { OdinTransport } from './transport/OdinTransport'
+import { WebUsbTransport } from './transport/WebUsbTransport'
 import { ByteArray } from './utils/ByteArray'
-import { timeoutPromise } from './utils/helpers'
 import { decompressLz4Sequence, isLz4Frame, lz4Sequences, parseLz4FrameHeader } from './utils/lz4'
 
 export type DeviceOptions = {
@@ -29,27 +30,29 @@ export type DeviceOptions = {
   logging: boolean
   /** the number of milliseconds to time out after */
   timeout: number
-  /** some OSes (like Ubuntu) have an issue with libusb that requires a reset call to be made on initialization */
+  /** some OSes (like Ubuntu) have an issue with libusb that requires a reset call to be made on initialization (WebUSB only; ignored over Web Serial) */
   resetOnInit: boolean
 }
-
-const USB_CLASS_CDC_DATA = 0x0a
 
 const BEGIN_SESSION_DELAY = 3000
 
 // Short: no response is expected from a drain receive, so it just elapses.
-const EMPTY_RECEIVE_TIMEOUT = 100;
+const EMPTY_RECEIVE_TIMEOUT = 100
 
-const DEFAULT_DEVICE_OPTIONS = {
+const DEFAULT_DEVICE_OPTIONS: DeviceOptions = {
   logging: false,
   timeout: 5000,
   resetOnInit: false
-} as DeviceOptions
+}
+
+function isUsbDevice(value: OdinTransport | USBDevice): value is USBDevice {
+  return 'transferIn' in value && typeof value.transferIn === 'function'
+}
 
 export class OdinDevice {
-  usbDevice: USBDevice
-  outEndpointNum = -1
-  inEndpointNum = -1
+  transport: OdinTransport
+  /** The underlying WebUSB device, when connected over WebUSB. */
+  usbDevice?: USBDevice
   deviceOptions: DeviceOptions
 
   _devicePit?: PitData
@@ -63,14 +66,16 @@ export class OdinDevice {
   _flashSessionStarted = false
   _lz4Supported = false
 
-  /**
-   * A transferIn left pending by a timed-out _emptyReceive. WebUSB cannot
-   * cancel transfers, so the next receive must consume it.
-   */
-  _orphanedReceive: Promise<USBInTransferResult> | undefined
-
-  constructor(usbDevice: USBDevice, options?: Partial<DeviceOptions>) {
-    this.usbDevice = usbDevice
+  constructor(transport: OdinTransport | USBDevice, options?: Partial<DeviceOptions>) {
+    if (isUsbDevice(transport)) {
+      this.usbDevice = transport
+      this.transport = new WebUsbTransport(transport)
+    } else {
+      this.transport = transport
+      if (transport instanceof WebUsbTransport) {
+        this.usbDevice = transport.device
+      }
+    }
     this.deviceOptions = { ...DEFAULT_DEVICE_OPTIONS, ...options }
   }
 
@@ -79,14 +84,10 @@ export class OdinDevice {
   }
 
   onDisconnect(callback: () => void) {
-    const eventHandler = (event: USBConnectionEvent) => {
-      if (event.device === this.usbDevice) {
-        callback()
-        this._flashSessionStarted = false
-        navigator.usb.removeEventListener('disconnect', eventHandler)
-      }
-    }
-    navigator.usb.addEventListener('disconnect', eventHandler)
+    this.transport.onDisconnect(() => {
+      this._flashSessionStarted = false
+      callback()
+    })
   }
 
   /**
@@ -94,78 +95,7 @@ export class OdinDevice {
    */
   async initialize() {
     try {
-      await timeoutPromise(
-        this.usbDevice.open(),
-        '[initialize] unable to open device handle',
-        this.deviceOptions.timeout
-      )
-
-      if (!this.usbDevice.configuration) {
-        await timeoutPromise(
-          this.usbDevice.selectConfiguration(1),
-          '[initialize] unable to select device configuration',
-          this.deviceOptions.timeout
-        )
-      }
-
-      let interfaceNum = -1
-      let altInterfaceNum = -1
-
-      if (!this.usbDevice.configuration) {
-        throw new Error('Unable to select the proper configuration')
-      }
-
-      const usbConfiguration = this.usbDevice.configuration
-
-      for (const interfaceIndex in usbConfiguration.interfaces) {
-        const usbInterface = usbConfiguration.interfaces[interfaceIndex]!
-
-        for (const altIndex in usbInterface.alternates) {
-          const altInterface = usbInterface.alternates[altIndex]!
-
-          const outEndpoint =
-            altInterface.endpoints.find((endpoint) => endpoint.direction === 'out')
-              ?.endpointNumber || -1
-          const inEndpoint =
-            altInterface.endpoints.find((endpoint) => endpoint.direction === 'in')
-              ?.endpointNumber || -1
-
-          if (
-            altInterface.endpoints.length === 2 &&
-            altInterface.interfaceClass === USB_CLASS_CDC_DATA &&
-            outEndpoint != -1 &&
-            inEndpoint != -1
-          ) {
-            altInterfaceNum = Number(altIndex)
-            this.outEndpointNum = outEndpoint
-            this.inEndpointNum = inEndpoint
-            break
-          }
-        }
-
-        if (altInterfaceNum !== -1) {
-          interfaceNum = Number(interfaceIndex)
-          break
-        }
-      }
-
-      if (this.outEndpointNum === -1 || this.inEndpointNum === -1) {
-        throw new Error('Unable to locate the bulk command endpoints')
-      }
-
-      await timeoutPromise(
-        this.usbDevice.claimInterface(interfaceNum),
-        '[initialize] unable to claim device interface',
-        this.deviceOptions.timeout
-      )
-
-      if (altInterfaceNum !== 0) {
-        await timeoutPromise(
-          this.usbDevice.selectAlternateInterface(interfaceNum, 0),
-          "[initialize] unable to select device's ODIN interface",
-          this.deviceOptions.timeout
-        )
-      }
+      await this.transport.connect(this.deviceOptions.timeout)
     } catch (errorMsg) {
       if (this.deviceOptions.logging) console.log(errorMsg)
       throw new Error('Unable to open and claim device', { cause: errorMsg })
@@ -183,33 +113,14 @@ export class OdinDevice {
     const acknowledgeMsg = 'LOKE'
 
     if (this.deviceOptions.resetOnInit) {
-      await timeoutPromise(
-        this.usbDevice.reset(),
-        '[handshake] unable to reset device',
-        this.deviceOptions.timeout
-      )
+      await this.transport.reset(this.deviceOptions.timeout)
     }
 
-    const outResult = await timeoutPromise(
-      this.usbDevice.transferOut(this.outEndpointNum, ByteArray.fromString(helloMsg)),
-      '[handshake] unable to send ODIN handshake',
-      this.deviceOptions.timeout
-    )
-    if (this.deviceOptions.logging) console.log(`sent: ${helloMsg}, status: ${outResult.status}`)
-    if (outResult.status !== 'ok') {
-      throw new Error(`handshake transmit status ${outResult.status}`)
-    }
+    await this.transport.send(ByteArray.fromString(helloMsg), this.deviceOptions.timeout)
+    if (this.deviceOptions.logging) console.log(`sent: ${helloMsg}`)
 
-    const inResult = await timeoutPromise(
-      this.usbDevice.transferIn(this.inEndpointNum, 7),
-      '[handshake] unable to receive ODIN handshake response',
-      this.deviceOptions.timeout
-    )
-    if (inResult.data == null || inResult.status !== 'ok') {
-      throw new Error(`handshake response status ${inResult.status}`)
-    }
-
-    const stringResult = ByteArray.toString(new Uint8Array(inResult.data.buffer))
+    const response = await this.transport.receive(acknowledgeMsg.length, this.deviceOptions.timeout)
+    const stringResult = ByteArray.toString(response)
 
     if (this.deviceOptions.logging) console.log(`received: ${stringResult}`)
     if (stringResult !== acknowledgeMsg) {
@@ -218,11 +129,7 @@ export class OdinDevice {
   }
 
   async close() {
-    await timeoutPromise(
-      this.usbDevice.close(),
-      '[close] unable to close device',
-      this.deviceOptions.timeout
-    )
+    await this.transport.close(this.deviceOptions.timeout)
   }
 
   async requestDeviceType() {
@@ -336,7 +243,14 @@ export class OdinDevice {
         console.log(`getPitData: sending partial packet ${i + 1} of ${transferCount}`)
       await this.sendPacket(new DumpPartPitFilePacket(i))
 
-      const receivePitPartResponse = await this.receivePacket(ReceiveFilePartPacket)
+      // The final part is short; request its exact length so stream transports
+      // know when to stop reading.
+      const expectedSize = Math.min(ReceiveFilePartPacket.dataSize, fileSize - offset)
+      const receivePitPartResponse = await this.receivePacket(
+        ReceiveFilePartPacket,
+        undefined,
+        expectedSize
+      )
 
       // Copy all of the packet data into the buffer.
       fileData.set(receivePitPartResponse.data, offset)
@@ -554,78 +468,40 @@ export class OdinDevice {
 
     if (this.deviceOptions.logging) console.log('sending', packet)
 
-    return timeoutPromise(
-      this.usbDevice.transferOut(this.outEndpointNum, packet.data),
-      '[device] unable to send packet',
-      timeout ?? this.deviceOptions.timeout
-    ).then((result) => {
-      if (this.deviceOptions.logging) console.log('sendPacket response', result)
-      return result
-    })
+    await this.transport.send(packet.data, timeout ?? this.deviceOptions.timeout)
+
+    if (this.deviceOptions.logging) console.log('sendPacket sent', packet)
   }
 
-  async receivePacket<T extends InboundPacket>(type: { new (): T }, timeout?: number): Promise<T> {
+  async receivePacket<T extends InboundPacket>(
+    type: { new (): T },
+    timeout?: number,
+    size?: number
+  ): Promise<T> {
     const packet = new type()
 
-    const data = await this._receive(packet.size, timeout ?? this.deviceOptions.timeout)
+    const data = await this.transport.receive(
+      size ?? packet.size,
+      timeout ?? this.deviceOptions.timeout
+    )
     if (this.deviceOptions.logging) console.log('received packet', packet)
 
-    if (data.data == null || data.status !== 'ok') {
-      throw new Error('receivePacket failed')
-    }
-
-    if (data.data?.byteLength !== packet.size && !packet.sizeVariable) {
+    if (data.byteLength !== packet.size && !packet.sizeVariable) {
       throw new Error('incorrect size received')
     }
-    packet.data = new Uint8Array(data.data.buffer as ArrayBuffer)
-    packet.receivedSize = data.data.byteLength
+    packet.data = data
+    packet.receivedSize = data.byteLength
 
     packet.unpack()
 
     return packet
   }
 
-  async _receive(length: number, timeout: number): Promise<USBInTransferResult> {
-    const orphan = this._orphanedReceive
-    if (orphan) {
-      this._orphanedReceive = undefined
-      let result: USBInTransferResult
-      try {
-        result = await timeoutPromise(
-          orphan,
-          '[device] unable to receive packet from device',
-          timeout
-        )
-      } catch (error) {
-        this._orphanedReceive = orphan
-        throw error
-      }
-      if (result.data != null && result.data.byteLength > 0) {
-        return result
-      }
-      // the empty receive arrived late; discard it and receive normally
-    }
-
-    return timeoutPromise(
-      this.usbDevice.transferIn(this.inEndpointNum, length),
-      '[device] unable to receive packet from device',
-      timeout
-    )
-  }
-
   async _emptyReceive(timeout?: number) {
-    // 1024 covers the largest inbound packet in case a real packet lands here
-    const transfer = this._orphanedReceive ?? this.usbDevice.transferIn(this.inEndpointNum, 1024)
-    this._orphanedReceive = undefined
-
     try {
-      await timeoutPromise(
-        transfer,
-        '[device] device did not respond to empty receive, continuing...',
-        timeout ?? EMPTY_RECEIVE_TIMEOUT
-      )
+      // 1024 covers the largest inbound packet in case a real packet lands here
+      await this.transport.emptyReceive(1024, timeout ?? EMPTY_RECEIVE_TIMEOUT)
     } catch (error) {
-      this._orphanedReceive = transfer
       console.warn(error)
     }
   }

@@ -5,7 +5,7 @@
     "module": "esnext",
     "moduleResolution": "bundler",
     "target": "es2022",
-    "types": ["w3c-web-usb", "node"],
+    "types": ["w3c-web-usb", "w3c-web-serial", "node"],
 
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
