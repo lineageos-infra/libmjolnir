@@ -1,6 +1,6 @@
 {
   "name": "@lineageos-infra/libmjolnir",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "WebUSB library for communicating with Samsung devices in Download Mode",
   "type": "module",
   "main": "dist/index.js",
