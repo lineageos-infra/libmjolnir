@@ -12,3 +12,24 @@ export const timeoutPromise = <T>(promise: Promise<T>, reason: string, ms: numbe
     })
   ])
 }
+
+/**
+ * Register a one-shot `disconnect` listener that fires `callback` only for the
+ * matching device, then removes itself.
+ * @param target - the event target to listen on (e.g. `navigator.usb`)
+ * @param matches - predicate identifying this transport's own disconnect event
+ * @param callback - invoked once when the matching device disconnects
+ */
+export function listenForDisconnect(
+  target: EventTarget,
+  matches: (event: Event) => boolean,
+  callback: () => void
+): void {
+  const handler = (event: Event) => {
+    if (matches(event)) {
+      callback()
+      target.removeEventListener('disconnect', handler)
+    }
+  }
+  target.addEventListener('disconnect', handler)
+}

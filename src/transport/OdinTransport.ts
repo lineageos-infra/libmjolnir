@@ -17,9 +17,9 @@ export interface OdinTransport {
   receive(length: number, timeout: number): Promise<Uint8Array<ArrayBuffer>>
 
   /**
-   * Best-effort drain of a trailing/empty response. Resolves once the device
-   * has been given a chance to respond, or rejects on timeout. Any bytes that
-   * do arrive are buffered for the next {@link receive}.
+   * Best-effort drain of a trailing/empty response. Always resolves; if the
+   * device does not respond in time the drain is abandoned and any in-flight
+   * read is buffered for the next {@link receive}.
    */
   emptyReceive(length: number, timeout: number): Promise<void>
 

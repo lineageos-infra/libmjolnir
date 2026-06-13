@@ -51,8 +51,6 @@ function isUsbDevice(value: OdinTransport | USBDevice): value is USBDevice {
 
 export class OdinDevice {
   transport: OdinTransport
-  /** The underlying WebUSB device, when connected over WebUSB. */
-  usbDevice?: USBDevice
   deviceOptions: DeviceOptions
 
   _devicePit?: PitData
@@ -67,16 +65,13 @@ export class OdinDevice {
   _lz4Supported = false
 
   constructor(transport: OdinTransport | USBDevice, options?: Partial<DeviceOptions>) {
-    if (isUsbDevice(transport)) {
-      this.usbDevice = transport
-      this.transport = new WebUsbTransport(transport)
-    } else {
-      this.transport = transport
-      if (transport instanceof WebUsbTransport) {
-        this.usbDevice = transport.device
-      }
-    }
+    this.transport = isUsbDevice(transport) ? new WebUsbTransport(transport) : transport
     this.deviceOptions = { ...DEFAULT_DEVICE_OPTIONS, ...options }
+  }
+
+  /** The underlying WebUSB device, when connected over WebUSB. */
+  get usbDevice(): USBDevice | undefined {
+    return this.transport instanceof WebUsbTransport ? this.transport.device : undefined
   }
 
   get lz4Supported() {
@@ -85,8 +80,8 @@ export class OdinDevice {
 
   onDisconnect(callback: () => void) {
     this.transport.onDisconnect(() => {
-      this._flashSessionStarted = false
       callback()
+      this._flashSessionStarted = false
     })
   }
 
@@ -498,11 +493,8 @@ export class OdinDevice {
   }
 
   async _emptyReceive(timeout?: number) {
-    try {
-      // 1024 covers the largest inbound packet in case a real packet lands here
-      await this.transport.emptyReceive(1024, timeout ?? EMPTY_RECEIVE_TIMEOUT)
-    } catch (error) {
-      console.warn(error)
-    }
+    // 1024 covers the largest inbound packet in case a real packet lands here.
+    // The drain is best-effort and never rejects.
+    await this.transport.emptyReceive(1024, timeout ?? EMPTY_RECEIVE_TIMEOUT)
   }
 }

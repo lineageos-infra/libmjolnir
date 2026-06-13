@@ -479,15 +479,15 @@ describe('getPitData', () => {
     expect(pit.matches(reference)).toBe(true)
   })
 
-  test('tolerates a failing empty receive during the dump', async () => {
+  test('drains best-effort before ending the dump', async () => {
     const { transport, queue } = createFakeTransport()
-    transport.emptyReceive.mockRejectedValue(new Error('drain failed'))
     const device = new OdinDevice(transport)
     const pitBytes = readFixture(SAMPLE_PIT)
     queuePitDump(queue, pitBytes)
 
     const pit = await device.getPitData()
 
+    expect(transport.emptyReceive).toHaveBeenCalled()
     expect(pit.entryCount).toBeGreaterThan(0)
   })
 })

@@ -64,6 +64,17 @@ describe('WebSerialTransport', () => {
     expect([...(await transport.receive(4, 1000))]).toEqual([1, 2, 3, 4])
   })
 
+  test('serves successive reads across chunk boundaries', async () => {
+    const { transport, enqueue } = await connectedTransport()
+    enqueue([1, 2, 3])
+    enqueue([4, 5, 6])
+
+    // a read that spans a partially-consumed chunk and the next chunk
+    expect([...(await transport.receive(2, 1000))]).toEqual([1, 2])
+    expect([...(await transport.receive(3, 1000))]).toEqual([3, 4, 5])
+    expect([...(await transport.receive(1, 1000))]).toEqual([6])
+  })
+
   test('skips empty chunks while buffering', async () => {
     const { transport, enqueue } = await connectedTransport()
     enqueue([]) // an empty chunk must not disturb buffering
@@ -97,9 +108,15 @@ describe('WebSerialTransport', () => {
     expect([...(await transport.receive(3, 1000))]).toEqual([1, 2, 3])
   })
 
-  test('emptyReceive rejects when nothing arrives', async () => {
-    const { transport } = await connectedTransport()
-    await expect(transport.emptyReceive(1024, 20)).rejects.toThrow()
+  test('emptyReceive resolves when nothing arrives and keeps the read for next time', async () => {
+    const { transport, enqueue } = await connectedTransport()
+
+    // best-effort: a drain with no response resolves rather than rejecting
+    await expect(transport.emptyReceive(1024, 20)).resolves.toBeUndefined()
+
+    // the timed-out read is retained, so a later byte is still delivered
+    enqueue([7, 8])
+    expect([...(await transport.receive(2, 1000))]).toEqual([7, 8])
   })
 
   test('connect tolerates a port that cannot set DTR', async () => {

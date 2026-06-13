@@ -166,7 +166,7 @@ describe('WebUsbTransport.emptyReceive', () => {
     )
     const transport = new WebUsbTransport(device as unknown as USBDevice)
 
-    await expect(transport.emptyReceive(1024, 10)).rejects.toThrow()
+    await expect(transport.emptyReceive(1024, 10)).resolves.toBeUndefined()
     expect(device.transferIn).toHaveBeenCalledTimes(1)
 
     // the drain response arrives late; the next receive consumes it without a new transfer
@@ -181,7 +181,7 @@ describe('WebUsbTransport.emptyReceive', () => {
     device.transferIn.mockReturnValueOnce(new Promise(() => {})) // never resolves
     const transport = new WebUsbTransport(device as unknown as USBDevice)
 
-    await expect(transport.emptyReceive(1024, 10)).rejects.toThrow()
+    await expect(transport.emptyReceive(1024, 10)).resolves.toBeUndefined()
     await expect(transport.receive(2, 10)).rejects.toThrow()
 
     // the orphan is re-stashed rather than dropped, so no new transfer is issued

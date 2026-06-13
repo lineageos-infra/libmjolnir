@@ -1,4 +1,4 @@
-import { timeoutPromise } from '../utils/helpers'
+import { listenForDisconnect, timeoutPromise } from '../utils/helpers'
 import { OdinTransport } from './OdinTransport'
 
 const USB_CLASS_CDC_DATA = 0x0a
@@ -131,9 +131,9 @@ export class WebUsbTransport implements OdinTransport {
 
     try {
       await timeoutPromise(transfer, '[device] device did not respond to empty receive', timeout)
-    } catch (error) {
+    } catch {
+      // best-effort: stash the in-flight transfer for the next receive to consume
       this._orphanedReceive = transfer
-      throw error
     }
   }
 
@@ -146,13 +146,11 @@ export class WebUsbTransport implements OdinTransport {
   }
 
   onDisconnect(callback: () => void) {
-    const eventHandler = (event: USBConnectionEvent) => {
-      if (event.device === this.device) {
-        callback()
-        navigator.usb.removeEventListener('disconnect', eventHandler)
-      }
-    }
-    navigator.usb.addEventListener('disconnect', eventHandler)
+    listenForDisconnect(
+      navigator.usb,
+      (event) => (event as USBConnectionEvent).device === this.device,
+      callback
+    )
   }
 }
 

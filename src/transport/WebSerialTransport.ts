@@ -1,4 +1,4 @@
-import { timeoutPromise } from '../utils/helpers'
+import { listenForDisconnect, timeoutPromise } from '../utils/helpers'
 import { OdinTransport } from './OdinTransport'
 
 // CDC-ACM ignores the baud rate, but Web Serial requires one.
@@ -16,7 +16,11 @@ export class WebSerialTransport implements OdinTransport {
   private _reader: ReadableStreamDefaultReader<Uint8Array> | undefined
   private _writer: WritableStreamDefaultWriter<Uint8Array> | undefined
 
-  private _buffered: Uint8Array = new Uint8Array(0)
+  // Received-but-unconsumed bytes, kept as a queue so appending a chunk is O(1)
+  // and the residual tail is never re-copied on each receive.
+  private _chunks: Uint8Array[] = []
+  private _chunkOffset = 0
+  private _available = 0
 
   // A read() left pending by a timed-out receive; the next read must await it
   // rather than start a new one, or the chunk it resolves with is lost.
@@ -57,17 +61,38 @@ export class WebSerialTransport implements OdinTransport {
   }
 
   async receive(length: number, timeout: number) {
-    while (this._buffered.length < length) {
+    while (this._available < length) {
       this._append(await this._readChunk(timeout))
     }
 
-    const out = this._buffered.slice(0, length)
-    this._buffered = this._buffered.slice(length)
+    const out = new Uint8Array(length)
+    let written = 0
+    while (written < length) {
+      const head = this._chunks[0]!
+      const available = head.length - this._chunkOffset
+      const take = Math.min(available, length - written)
+      out.set(head.subarray(this._chunkOffset, this._chunkOffset + take), written)
+      written += take
+
+      if (take === available) {
+        this._chunks.shift()
+        this._chunkOffset = 0
+      } else {
+        this._chunkOffset += take
+      }
+    }
+    this._available -= length
     return out
   }
 
   async emptyReceive(_length: number, timeout: number) {
-    this._append(await this._readChunk(timeout))
+    // Best-effort drain: a timed-out read leaves a pending read for the next
+    // receive (see _readChunk), so swallow the timeout rather than reject.
+    try {
+      this._append(await this._readChunk(timeout))
+    } catch {
+      // drain abandoned
+    }
   }
 
   reset(): Promise<void> {
@@ -96,19 +121,15 @@ export class WebSerialTransport implements OdinTransport {
     }
 
     this._pendingRead = undefined
-    this._buffered = new Uint8Array(0)
+    this._chunks = []
+    this._chunkOffset = 0
+    this._available = 0
 
     await timeoutPromise(this.port.close(), '[close] unable to close serial port', timeout)
   }
 
   onDisconnect(callback: () => void) {
-    const eventHandler = (event: Event) => {
-      if (event.target === this.port) {
-        callback()
-        navigator.serial.removeEventListener('disconnect', eventHandler)
-      }
-    }
-    navigator.serial.addEventListener('disconnect', eventHandler)
+    listenForDisconnect(navigator.serial, (event) => event.target === this.port, callback)
   }
 
   private async _readChunk(timeout: number): Promise<Uint8Array> {
@@ -132,13 +153,7 @@ export class WebSerialTransport implements OdinTransport {
     if (chunk.length === 0) {
       return
     }
-    if (this._buffered.length === 0) {
-      this._buffered = chunk
-      return
-    }
-    const merged = new Uint8Array(this._buffered.length + chunk.length)
-    merged.set(this._buffered, 0)
-    merged.set(chunk, this._buffered.length)
-    this._buffered = merged
+    this._chunks.push(chunk)
+    this._available += chunk.length
   }
 }
