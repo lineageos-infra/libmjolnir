@@ -1,5 +1,12 @@
 import { BasePacket } from '../BasePacket'
 
+export enum EmptySendKind {
+  None,
+  Before = 1 << 0,
+  After = 1 << 1,
+  BeforeAndAfter = Before | After
+}
+
 export class OutboundPacket extends BasePacket {
   constructor(size: number) {
     super(size)

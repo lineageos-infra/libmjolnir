@@ -325,7 +325,7 @@ describe('beginSession', () => {
     expect(device._flashSessionStarted).toBe(true)
     expect(device.lz4Supported).toBe(false)
     expect(device._flashPacketSize).toBe(131072)
-    expect(sent).toHaveLength(1)
+    expect(sent).toHaveLength(2)
     expect(readUint32LE(sent[0]!, 4)).toBe(0) // BeginSession request
   })
 
@@ -357,8 +357,8 @@ describe('beginSession', () => {
     expect(device._flashTimeout).toBe(120000)
     expect(device._flashPacketSize).toBe(1048576)
     expect(device._flashSequence).toBe(30)
-    expect(readUint32LE(sent[1]!, 4)).toBe(5) // FilePartSize request
-    expect(readUint32LE(sent[1]!, 8)).toBe(1048576)
+    expect(readUint32LE(sent[2]!, 4)).toBe(5) // FilePartSize request
+    expect(readUint32LE(sent[2]!, 8)).toBe(1048576)
   })
 
   test('is a no-op when a session is already started', async () => {
@@ -382,7 +382,7 @@ describe('beginSession', () => {
     await vi.runAllTimersAsync()
     await begin
 
-    expect(sent).toHaveLength(1)
+    expect(sent).toHaveLength(2)
   })
 })
 
@@ -470,7 +470,7 @@ describe('endSession', () => {
 
     await device.endSession(false, true)
 
-    expect(sent).toHaveLength(1)
+    expect(sent).toHaveLength(2)
   })
 })
 
@@ -584,7 +584,7 @@ describe('sendFile', () => {
     expect(readUint32LE(sent[0]!, 0)).toBe(0x66) // FileTransfer control
     expect(readUint32LE(sent[0]!, 4)).toBe(0) // Flash request
     // the last packet is an EndPhone file transfer (FileTransfer control, End request)
-    const endPacket = sent[sent.length - 1]!
+    const endPacket = sent[sent.length - 2]!
     expect(readUint32LE(endPacket, 0)).toBe(0x66)
     expect(readUint32LE(endPacket, 4)).toBe(3) // End request
   })
@@ -601,7 +601,7 @@ describe('sendFile', () => {
 
     await device.sendFile(file, 1, 0, 5) // CommunicationProcessor
 
-    const endPacket = sent[sent.length - 1]!
+    const endPacket = sent[sent.length - 2]!
     expect(readUint32LE(endPacket, 0)).toBe(0x66)
     expect(readUint32LE(endPacket, 4)).toBe(3) // End request
   })
@@ -783,18 +783,18 @@ describe('flashPit', () => {
     await vi.runAllTimersAsync()
     await flash
 
-    expect(readUint32LE(sent[1]!, 0)).toBe(0x65) // PitFile control
-    expect(readUint32LE(sent[1]!, 4)).toBe(0) // Flash request
-
-    expect(readUint32LE(sent[2]!, 0)).toBe(0x65)
-    expect(readUint32LE(sent[2]!, 4)).toBe(2) // Part request
-    expect(readUint32LE(sent[2]!, 8)).toBe(dataSize)
-
-    expect(sent[3]!.byteLength).toBe(dataSize) // raw PIT data
+    expect(readUint32LE(sent[2]!, 0)).toBe(0x65) // PitFile control
+    expect(readUint32LE(sent[2]!, 4)).toBe(0) // Flash request
 
     expect(readUint32LE(sent[4]!, 0)).toBe(0x65)
-    expect(readUint32LE(sent[4]!, 4)).toBe(3) // EndTransfer request
+    expect(readUint32LE(sent[4]!, 4)).toBe(2) // Part request
     expect(readUint32LE(sent[4]!, 8)).toBe(dataSize)
+
+    expect(sent[6]!.byteLength).toBe(dataSize) // raw PIT data
+
+    expect(readUint32LE(sent[8]!, 0)).toBe(0x65)
+    expect(readUint32LE(sent[8]!, 4)).toBe(3) // EndTransfer request
+    expect(readUint32LE(sent[8]!, 8)).toBe(dataSize)
 
     expect(device._flashSessionStarted).toBe(false)
     expect(device._devicePit).toBeUndefined()
@@ -815,9 +815,9 @@ describe('flashPit', () => {
 
     await device.flashPit(pitBytes)
 
-    expect(readUint32LE(sent[1]!, 8)).toBe(pitBytes.byteLength) // FlashPart size
-    expect(sent[2]!.byteLength).toBe(pitBytes.byteLength) // raw data length
-    expect(sent[2]!).toEqual(pitBytes)
-    expect(readUint32LE(sent[3]!, 8)).toBe(pitBytes.byteLength) // EndTransfer size
+    expect(readUint32LE(sent[2]!, 8)).toBe(pitBytes.byteLength) // FlashPart size
+    expect(sent[4]!.byteLength).toBe(pitBytes.byteLength) // raw data length
+    expect(sent[4]!).toEqual(pitBytes)
+    expect(readUint32LE(sent[6]!, 8)).toBe(pitBytes.byteLength) // EndTransfer size
   })
 })

@@ -19,7 +19,7 @@ import { FilePartSizePacket } from './packets/outbound/FilePartSizePacket'
 import { FileTransferPacket, FileTransferRequest } from './packets/outbound/FileTransferPacket'
 import { FlashPartFileTransferPacket } from './packets/outbound/FlashPartFileTransferPacket'
 import { FlashPartPitFilePacket } from './packets/outbound/FlashPartPitFilePacket'
-import { OutboundPacket } from './packets/outbound/OutboundPacket'
+import { EmptySendKind, OutboundPacket } from './packets/outbound/OutboundPacket'
 import { PitFilePacket, PitFileRequest } from './packets/outbound/PitFilePacket'
 import { SendFilePartPacket } from './packets/outbound/SendFilePartPacket'
 import { TotalBytesPacket } from './packets/outbound/TotalBytesPacket'
@@ -42,7 +42,7 @@ export type DeviceOptions = {
 const BEGIN_SESSION_DELAY = 3000
 
 // Short: no response is expected from a drain receive, so it just elapses.
-const EMPTY_RECEIVE_TIMEOUT = 100
+const EMPTY_TRANSFER_TIMEOUT = 100
 
 const DEFAULT_DEVICE_OPTIONS: DeviceOptions = {
   logging: false,
@@ -460,6 +460,7 @@ export class OdinDevice {
   ) {
     await this.sendPacket(
       new FlashPartFileTransferPacket(sequenceData.length, lz4),
+      undefined,
       this._flashTimeout
     )
     await this.receivePacket(FileTransferResponse, this._flashTimeout)
@@ -474,6 +475,7 @@ export class OdinDevice {
 
       await this.sendPacket(
         new SendFilePartPacket(partData, this._flashPacketSize),
+        filePartIndex === 0 ? EmptySendKind.None : EmptySendKind.Before,
         this._flashTimeout
       )
 
@@ -500,16 +502,32 @@ export class OdinDevice {
             lz4
           )
 
-    await this.sendPacket(endPacket, this._flashTimeout)
+    await this.sendPacket(endPacket, EmptySendKind.BeforeAndAfter, this._flashTimeout)
     await this.receivePacket(FileTransferResponse, this._flashTimeout)
   }
 
-  async sendPacket(packet: OutboundPacket, timeout?: number) {
+  async sendPacket(packet: OutboundPacket, emptySendKind?: EmptySendKind, timeout?: number) {
     packet.pack()
 
     this._log('debug', 'sending', packet)
 
+    if (emptySendKind === undefined) {
+      emptySendKind = EmptySendKind.After
+    }
+
+    if ((emptySendKind & EmptySendKind.Before) !== 0) {
+      await this.transport.send(new Uint8Array(), EMPTY_TRANSFER_TIMEOUT).catch(() => {
+        // It's ok if this fails.
+      })
+    }
+
     await this.transport.send(packet.data, timeout ?? this.deviceOptions.timeout)
+
+    if ((emptySendKind & EmptySendKind.After) !== 0) {
+      await this.transport.send(new Uint8Array(), EMPTY_TRANSFER_TIMEOUT).catch(() => {
+        // It's ok if this fails.
+      })
+    }
 
     this._log('debug', 'sendPacket sent', packet)
   }
@@ -541,6 +559,6 @@ export class OdinDevice {
   async _emptyReceive(timeout?: number) {
     // 1024 covers the largest inbound packet in case a real packet lands here.
     // The drain is best-effort and never rejects.
-    await this.transport.emptyReceive(1024, timeout ?? EMPTY_RECEIVE_TIMEOUT)
+    await this.transport.emptyReceive(1024, timeout ?? EMPTY_TRANSFER_TIMEOUT)
   }
 }
