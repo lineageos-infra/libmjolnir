@@ -81,6 +81,20 @@ describe('parseLz4FrameHeader', () => {
       'block max size'
     )
   })
+
+  test('rejects data that is not an LZ4 frame', () => {
+    expect(() => parseLz4FrameHeader(new Uint8Array(16))).toThrow('valid LZ4 frame')
+  })
+
+  test('rejects a truncated frame header', () => {
+    const frame = new Uint8Array(10)
+    new DataView(frame.buffer).setUint32(0, 0x184d2204, true)
+    expect(() => parseLz4FrameHeader(frame)).toThrow('truncated')
+  })
+
+  test('rejects an unsupported frame version', () => {
+    expect(() => parseLz4FrameHeader(buildFrame(100, [10], 0x00))).toThrow('version')
+  })
 })
 
 describe('decompressLz4Block', () => {
@@ -108,6 +122,21 @@ describe('decompressLz4Block', () => {
     const block = new Uint8Array([0x10, 0x78, 0x05, 0x00])
 
     expect(() => decompressLz4Block(block, 64)).toThrow('match offset')
+  })
+
+  test('decompresses a block with an extended literal length', () => {
+    const literals = new Array(17).fill(0x41)
+    // token 0xf0 -> literal length 15, extension byte 0x02 -> 17 literals
+    const block = new Uint8Array([0xf0, 0x02, ...literals])
+
+    expect(Array.from(decompressLz4Block(block, 64))).toEqual(literals)
+  })
+
+  test('decompresses a block with an extended match length', () => {
+    // token 0x1f -> 1 literal, match length nibble 15, extension byte 0x03 -> length 22
+    const block = new Uint8Array([0x1f, 0x55, 0x01, 0x00, 0x03])
+
+    expect(Array.from(decompressLz4Block(block, 64))).toEqual(new Array(23).fill(0x55))
   })
 })
 
@@ -153,5 +182,35 @@ describe('lz4Sequences', () => {
     expect(sequences[0]!.data).toHaveLength(4 + 10)
     expect(sequences[1]!.decompressedSize).toBe(100000 - 64 * 1024)
     expect(sequences[1]!.data).toHaveLength(4 + 20)
+  })
+
+  test('stops scanning when the frame ends without an end marker', () => {
+    const full = buildFrame(100000, [10])
+    const header = parseLz4FrameHeader(full)
+    const frame = full.subarray(0, full.length - 4) // drop the EndMark
+
+    const sequences = Array.from(lz4Sequences(frame, header, 1024 * 1024))
+
+    expect(sequences).toHaveLength(1)
+    expect(sequences[0]!.data).toHaveLength(4 + 10)
+  })
+
+  test('clamps the final block to the available data', () => {
+    // a block header claiming 10 data bytes, but only 5 follow
+    const frame = new Uint8Array(15 + 4 + 5)
+    const view = new DataView(frame.buffer)
+    view.setUint32(0, 0x184d2204, true)
+    frame[4] = FLG_DEFAULT
+    frame[5] = 4 << 4
+    view.setUint32(6, 100000, true)
+    view.setUint32(10, 0, true)
+    frame[14] = 0xff
+    view.setUint32(15, 0x80000000 | 10, true)
+    const header = parseLz4FrameHeader(frame)
+
+    const sequences = Array.from(lz4Sequences(frame, header, 1024 * 1024))
+
+    expect(sequences).toHaveLength(1)
+    expect(sequences[0]!.data).toHaveLength(frame.length - header.headerLength)
   })
 })

@@ -79,6 +79,16 @@ describe('WebUsbTransport.connect', () => {
     expect(device.selectConfiguration).toHaveBeenCalledWith(1)
   })
 
+  test('throws when no configuration can be selected', async () => {
+    // selectConfiguration resolves but never assigns a configuration
+    const device = createFakeUsbDevice(undefined)
+    const transport = new WebUsbTransport(device as unknown as USBDevice)
+
+    await expect(transport.connect(1000)).rejects.toThrow(
+      'Unable to select the proper configuration'
+    )
+  })
+
   test('throws when no bulk command endpoints are found', async () => {
     const device = createFakeUsbDevice({
       interfaces: [

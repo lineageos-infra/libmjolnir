@@ -474,11 +474,11 @@ export class OdinDevice {
   }
 
   async receivePacket<T extends InboundPacket>(
-    type: { new (): T },
+    Packet: { new (): T },
     timeout?: number,
     size?: number
   ): Promise<T> {
-    const packet = new type()
+    const packet = new Packet()
 
     const data = await this.transport.receive(
       size ?? packet.size,
@@ -492,7 +492,7 @@ export class OdinDevice {
     packet.data = data
     packet.receivedSize = data.byteLength
 
-    packet.unpack()
+    await packet.unpack()
 
     return packet
   }

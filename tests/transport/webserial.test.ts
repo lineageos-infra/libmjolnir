@@ -64,6 +64,14 @@ describe('WebSerialTransport', () => {
     expect([...(await transport.receive(4, 1000))]).toEqual([1, 2, 3, 4])
   })
 
+  test('skips empty chunks while buffering', async () => {
+    const { transport, enqueue } = await connectedTransport()
+    enqueue([]) // an empty chunk must not disturb buffering
+    enqueue([1, 2])
+
+    expect([...(await transport.receive(2, 1000))]).toEqual([1, 2])
+  })
+
   test('writes sent data to the port', async () => {
     const { transport, writes } = await connectedTransport()
     await transport.send(new Uint8Array([9, 8, 7]), 1000)
@@ -158,6 +166,14 @@ describe('WebSerialTransport', () => {
     await expect(transport.send(new Uint8Array([1]), 1000)).rejects.toThrow(
       'serial port is not open'
     )
+  })
+
+  test('close is safe before the port is connected', async () => {
+    const { port, close } = createFakePort()
+    const transport = new WebSerialTransport(port)
+
+    await expect(transport.close(1000)).resolves.toBeUndefined()
+    expect(close).toHaveBeenCalledTimes(1)
   })
 
   test('onDisconnect fires the callback only when its own port disconnects', () => {

@@ -1,4 +1,6 @@
 import { describe, expect, test } from 'vitest'
+import { InboundPacket } from '../src/packets/inbound/InboundPacket'
+import { SessionSetupResponse } from '../src/packets/inbound/SessionSetupResponse'
 import { BeginSessionPacket } from '../src/packets/outbound/BeginSessionPacket'
 import { EndModemFileTransferPacket } from '../src/packets/outbound/EndModemFileTransferPacket'
 import { EndPhoneFileTransferPacket } from '../src/packets/outbound/EndPhoneFileTransferPacket'
@@ -25,6 +27,10 @@ describe('BeginSessionPacket', () => {
     expect(packedInteger(packet, 4)).toBe(0x00)
     expect(packedInteger(packet, 8)).toBe(0x04)
     expect(packedInteger(packet, 12)).toBe(0x00)
+  })
+
+  test('exposes its data size', () => {
+    expect(BeginSessionPacket.dataSize).toBe(12)
   })
 })
 
@@ -85,6 +91,13 @@ describe('EndModemFileTransferPacket', () => {
     expect(packedInteger(packet, 20)).toBe(2)
     expect(packedInteger(packet, 24)).toBe(1)
   })
+
+  test('clears the end-of-file flag for an intermediate sequence', () => {
+    const packet = new EndModemFileTransferPacket(7890, 1, 2, false)
+    packet.pack()
+
+    expect(packedInteger(packet, 24)).toBe(0)
+  })
 })
 
 describe('FlashPartFileTransferPacket', () => {
@@ -102,5 +115,41 @@ describe('FlashPartFileTransferPacket', () => {
     packet.pack()
 
     expect(packedInteger(packet, 4)).toBe(0x06)
+  })
+})
+
+describe('OutboundPacket', () => {
+  test('packShort writes a little-endian 16-bit value', () => {
+    const packet = new OutboundPacket(4)
+    packet.packShort(0, 0x1234)
+
+    expect(packet.data[0]).toBe(0x34)
+    expect(packet.data[1]).toBe(0x12)
+  })
+
+  test('the base pack throws when a subclass has not implemented it', () => {
+    expect(() => new OutboundPacket(4).pack()).toThrow('not implemented')
+  })
+})
+
+describe('InboundPacket', () => {
+  test('unpackInteger reads a little-endian 32-bit value', () => {
+    const packet = new InboundPacket(4)
+    packet.data = new Uint8Array([0x78, 0x56, 0x34, 0x12])
+
+    expect(packet.unpackInteger(0)).toBe(0x12345678)
+  })
+
+  test('the base unpack rejects when a subclass has not implemented it', async () => {
+    await expect(new InboundPacket(4).unpack()).rejects.toThrow('not implemented')
+  })
+})
+
+describe('ResponsePacket', () => {
+  test('unpack rejects when the received response type does not match', async () => {
+    // a freshly constructed response has all-zero data, so the type reads as 0
+    const response = new SessionSetupResponse()
+
+    await expect(response.unpack()).rejects.toThrow('response types differ')
   })
 })
