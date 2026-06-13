@@ -236,6 +236,44 @@ describe('handshake', () => {
   })
 })
 
+describe('logger', () => {
+  test('forwards debug lines to a custom logger when logging is enabled', async () => {
+    const { transport, queue } = createFakeTransport()
+    queue.push(ByteArray.fromString('LOKE'))
+    const logger = vi.fn()
+    const device = new OdinDevice(transport, { logging: true, logger })
+
+    await device.handshake()
+
+    expect(logger).toHaveBeenCalledWith('debug', 'sent: ODIN')
+    expect(console.log).not.toHaveBeenCalled()
+  })
+
+  test('skips debug lines when logging is disabled', async () => {
+    const { transport, queue } = createFakeTransport()
+    queue.push(ByteArray.fromString('LOKE'))
+    const logger = vi.fn()
+    const device = new OdinDevice(transport, { logger })
+
+    await device.handshake()
+
+    expect(logger).not.toHaveBeenCalled()
+  })
+
+  test('forwards info lines even when logging is disabled', async () => {
+    const { transport, queue } = createFakeTransport()
+    const logger = vi.fn()
+    const device = new OdinDevice(transport, { logger })
+    const pitBytes = readFixture(SAMPLE_PIT)
+    // a wrong-size end response makes the final receivePacket throw, logging an info warning
+    queuePitDump(queue, pitBytes, new Uint8Array(4))
+
+    await device.getPitData()
+
+    expect(logger).toHaveBeenCalledWith('info', expect.stringContaining('getPitData'))
+  })
+})
+
 describe('close', () => {
   test('delegates to the transport', async () => {
     const { transport } = createFakeTransport()

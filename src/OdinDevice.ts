@@ -1,4 +1,5 @@
 import { EntryBinaryType, PitData } from './libpit'
+import { consoleLogger, Logger, LogLevel } from './logger'
 import { EndSessionResponse } from './packets/inbound/EndSessionResponse'
 import { FileTransferResponse } from './packets/inbound/FileTransferResponse'
 import { InboundPacket } from './packets/inbound/InboundPacket'
@@ -34,6 +35,8 @@ export type DeviceOptions = {
   timeout: number
   /** some OSes (like Ubuntu) have an issue with libusb that requires a reset call to be made on initialization (WebUSB only; ignored over Web Serial) */
   resetOnInit: boolean
+  /** where to send log output; defaults to the console */
+  logger?: Logger
 }
 
 const BEGIN_SESSION_DELAY = 3000
@@ -80,6 +83,11 @@ export class OdinDevice {
     return this._lz4Supported
   }
 
+  private _log(level: LogLevel, ...data: unknown[]) {
+    if (level === 'debug' && !this.deviceOptions.logging) return
+    ;(this.deviceOptions.logger ?? consoleLogger)(level, ...data)
+  }
+
   onDisconnect(callback: () => void) {
     this.transport.onDisconnect(() => {
       callback()
@@ -94,7 +102,7 @@ export class OdinDevice {
     try {
       await this.transport.connect(this.deviceOptions.timeout)
     } catch (errorMsg) {
-      if (this.deviceOptions.logging) console.log(errorMsg)
+      this._log('debug', errorMsg)
       throw new Error('Unable to open and claim device', { cause: errorMsg })
     }
 
@@ -114,12 +122,12 @@ export class OdinDevice {
     }
 
     await this.transport.send(ByteArray.fromString(helloMsg), this.deviceOptions.timeout)
-    if (this.deviceOptions.logging) console.log(`sent: ${helloMsg}`)
+    this._log('debug', `sent: ${helloMsg}`)
 
     const response = await this.transport.receive(acknowledgeMsg.length, this.deviceOptions.timeout)
     const stringResult = ByteArray.toString(response)
 
-    if (this.deviceOptions.logging) console.log(`received: ${stringResult}`)
+    this._log('debug', `received: ${stringResult}`)
     if (stringResult !== acknowledgeMsg) {
       throw new Error('handshake challenge mismatch')
     }
@@ -236,8 +244,7 @@ export class OdinDevice {
     let offset = 0
 
     for (let i = 0; i < transferCount; i++) {
-      if (this.deviceOptions.logging)
-        console.log(`getPitData: sending partial packet ${i + 1} of ${transferCount}`)
+      this._log('debug', `getPitData: sending partial packet ${i + 1} of ${transferCount}`)
       await this.sendPacket(new DumpPartPitFilePacket(i))
 
       // The final part is short; request its exact length so stream transports
@@ -260,7 +267,10 @@ export class OdinDevice {
       await this.sendPacket(new PitFilePacket(PitFileRequest.EndTransfer))
       await this.receivePacket(PitFileResponse)
     } catch {
-      console.info('getPitData: failed to fully end PIT transfer session, continuing anyways...')
+      this._log(
+        'info',
+        'getPitData: failed to fully end PIT transfer session, continuing anyways...'
+      )
     }
 
     const pitData = new PitData()
@@ -363,7 +373,7 @@ export class OdinDevice {
     const sequenceCount = Math.ceil(fileSize / maxSequenceByteCount)
 
     for (let sequenceIndex = 0; sequenceIndex < sequenceCount; sequenceIndex++) {
-      console.log(`sending sequence ${sequenceIndex + 1} of ${sequenceCount}`)
+      this._log('info', `sending sequence ${sequenceIndex + 1} of ${sequenceCount}`)
 
       const startOffset = sequenceIndex * maxSequenceByteCount
       const sequenceData = fileData.subarray(
@@ -411,7 +421,7 @@ export class OdinDevice {
     )
 
     for (let sequenceIndex = 0; sequenceIndex < sequences.length; sequenceIndex++) {
-      console.log(`sending sequence ${sequenceIndex + 1} of ${sequences.length}`)
+      this._log('info', `sending sequence ${sequenceIndex + 1} of ${sequences.length}`)
 
       const { decompressedSize } = sequences[sequenceIndex]!
       let { data } = sequences[sequenceIndex]!
@@ -457,7 +467,7 @@ export class OdinDevice {
     const partCount = Math.ceil(sequenceData.length / this._flashPacketSize)
 
     for (let filePartIndex = 0; filePartIndex < partCount; filePartIndex++) {
-      console.log(`sending part ${filePartIndex + 1} of ${partCount}`)
+      this._log('info', `sending part ${filePartIndex + 1} of ${partCount}`)
 
       const startOffset = filePartIndex * this._flashPacketSize
       const partData = sequenceData.slice(startOffset, startOffset + this._flashPacketSize)
@@ -497,11 +507,11 @@ export class OdinDevice {
   async sendPacket(packet: OutboundPacket, timeout?: number) {
     packet.pack()
 
-    if (this.deviceOptions.logging) console.log('sending', packet)
+    this._log('debug', 'sending', packet)
 
     await this.transport.send(packet.data, timeout ?? this.deviceOptions.timeout)
 
-    if (this.deviceOptions.logging) console.log('sendPacket sent', packet)
+    this._log('debug', 'sendPacket sent', packet)
   }
 
   async receivePacket<T extends InboundPacket>(
@@ -515,7 +525,7 @@ export class OdinDevice {
       size ?? packet.size,
       timeout ?? this.deviceOptions.timeout
     )
-    if (this.deviceOptions.logging) console.log('received packet', packet)
+    this._log('debug', 'received packet', packet)
 
     if (data.byteLength !== packet.size && !packet.sizeVariable) {
       throw new Error('incorrect size received')
