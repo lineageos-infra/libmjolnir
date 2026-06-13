@@ -64,6 +64,21 @@
   async function flashPartition (data: {name: string, data: Uint8Array}) {
     await connectedDevice.value?.flashPartition(data.name, data.data);
   }
+
+  const pitFile = ref<File>();
+
+  function stagePitFile (event: Event) {
+    pitFile.value = (event.target as HTMLInputElement).files?.[0];
+  }
+
+  async function flashPit () {
+    if (!connectedDevice.value || !pitFile.value) {
+      return;
+    }
+
+    await connectedDevice.value.flashPit(new Uint8Array(await pitFile.value.arrayBuffer()));
+    await readPit(connectedDevice.value);
+  }
 </script>
 
 <template>
@@ -98,6 +113,11 @@
       </span>
       <button @click="rebootDevice">Reboot device</button>
       <button @click="refreshPit">Refresh PIT</button>
+    </div>
+    <div class="flash-pit">
+      <label>Flash PIT: </label>
+      <input type="file" accept=".pit" @change="stagePitFile" />
+      <button :disabled="!pitFile" @click="flashPit">Flash PIT</button>
     </div>
     <p class="hint">
       .lz4 files are flashed compressed when the device supports it, and decompressed on the host
@@ -221,6 +241,13 @@
     color: light-dark(#15803d, #4ade80);
     background-color: color-mix(in srgb, currentColor 12%, transparent);
     opacity: 1;
+  }
+
+  .flash-pit {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 1rem;
   }
 
   .hint {
