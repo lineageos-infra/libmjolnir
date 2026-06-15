@@ -8,7 +8,7 @@ export type Lz4FrameHeader = {
 
 export type Lz4Sequence = {
   decompressedSize: number
-  data: Uint8Array
+  data: Blob
 }
 
 const BLOCK_MAX_SIZES: Record<number, number> = {
@@ -155,12 +155,11 @@ export function decompressLz4Sequence(sequenceData: Uint8Array, blockMaxSize: nu
   return result
 }
 
-export function* lz4Sequences(
-  data: Uint8Array,
+export async function* lz4Sequences(
+  data: Blob,
   header: Lz4FrameHeader,
   maxSequenceDecompressedSize: number
-): Generator<Lz4Sequence> {
-  const view = new DataView(data.buffer, data.byteOffset, data.byteLength)
+): AsyncGenerator<Lz4Sequence> {
   let remainingDecompressed = header.contentSize
   let offset = header.headerLength
   let finished = false
@@ -173,12 +172,13 @@ export function* lz4Sequences(
     let end = offset
 
     for (;;) {
-      if (end + 4 > data.length) {
+      if (end + 4 > data.size) {
         finished = true
         break
       }
 
-      const blockSize = view.getUint32(end, true)
+      const blockHeader = new Uint8Array(await data.slice(end, end + 4).arrayBuffer())
+      const blockSize = new DataView(blockHeader.buffer).getUint32(0, true)
       if (blockSize === 0) {
         finished = true
         break
@@ -187,8 +187,8 @@ export function* lz4Sequences(
       decompressedSizeUpperBound += header.blockMaxSize
       end += 4 + (blockSize & 0x7fffffff)
 
-      if (end > data.length) {
-        end = data.length
+      if (end > data.size) {
+        end = data.size
         finished = true
         break
       }
@@ -202,7 +202,7 @@ export function* lz4Sequences(
       return
     }
 
-    yield { decompressedSize, data: data.subarray(offset, end) }
+    yield { decompressedSize, data: data.slice(offset, end) }
     offset = end
   }
 }

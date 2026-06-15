@@ -61,7 +61,7 @@
     connectedDevice.value?.reboot();
   }
 
-  async function flashPartition (data: {name: string, data: Uint8Array}) {
+  async function flashPartition (data: {name: string, data: Blob}) {
     await connectedDevice.value?.flashPartition(data.name, data.data);
   }
 
@@ -76,7 +76,7 @@
       return;
     }
 
-    await connectedDevice.value.flashPit(new Uint8Array(await pitFile.value.arrayBuffer()));
+    await connectedDevice.value.flashPit(pitFile.value);
     await readPit(connectedDevice.value);
   }
 </script>

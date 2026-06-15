@@ -566,7 +566,7 @@ describe('sendFile', () => {
     const device = new OdinDevice(transport)
     device._flashPacketSize = 4
     device._flashSequence = 2 // max sequence = 8 bytes
-    const file = new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]) // 2 sequences (8 + 2)
+    const file = new Blob([new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])]) // 2 sequences (8 + 2)
 
     queue.push(response(ResponseType.FileTransfer)) // Flash ack
     // sequence 0: FlashPart ack, 2 parts, end ack
@@ -592,7 +592,7 @@ describe('sendFile', () => {
   test('uses the modem end packet for CP partitions', async () => {
     const { transport, sent, queue } = createFakeTransport()
     const device = new OdinDevice(transport)
-    const file = new Uint8Array([1, 2, 3, 4])
+    const file = new Blob([new Uint8Array([1, 2, 3, 4])])
 
     queue.push(response(ResponseType.FileTransfer)) // Flash ack
     queue.push(response(ResponseType.FileTransfer)) // FlashPart ack
@@ -609,7 +609,7 @@ describe('sendFile', () => {
   test('throws when the device echoes the wrong part index', async () => {
     const { transport, queue } = createFakeTransport()
     const device = new OdinDevice(transport)
-    const file = new Uint8Array([1, 2, 3, 4])
+    const file = new Blob([new Uint8Array([1, 2, 3, 4])])
 
     queue.push(response(ResponseType.FileTransfer)) // Flash ack
     queue.push(response(ResponseType.FileTransfer)) // FlashPart ack
@@ -631,7 +631,7 @@ describe('sendLz4File', () => {
     queue.push(response(ResponseType.SendFilePart, 0))
     queue.push(response(ResponseType.FileTransfer)) // end ack
 
-    await device.sendLz4File(frame, 0, 0, 5)
+    await device.sendLz4File(new Blob([frame]), 0, 0, 5)
 
     expect(readUint32LE(sent[0]!, 0)).toBe(0x66) // FileTransfer control
     expect(readUint32LE(sent[0]!, 4)).toBe(5) // Lz4Flash request
@@ -648,7 +648,7 @@ describe('sendLz4File', () => {
     queue.push(response(ResponseType.SendFilePart, 0))
     queue.push(response(ResponseType.FileTransfer)) // end ack
 
-    await device.sendLz4File(frame, 0, 0, 5)
+    await device.sendLz4File(new Blob([frame]), 0, 0, 5)
 
     expect(readUint32LE(sent[0]!, 4)).toBe(0) // Flash request (not Lz4)
   })
@@ -661,7 +661,9 @@ describe('sendLz4File', () => {
 
     queue.push(response(ResponseType.FileTransfer)) // Flash ack
 
-    await expect(device.sendLz4File(frame, 0, 0, 5)).rejects.toThrow('decompressed sequence size')
+    await expect(device.sendLz4File(new Blob([frame]), 0, 0, 5)).rejects.toThrow(
+      'decompressed sequence size'
+    )
   })
 })
 
@@ -686,7 +688,7 @@ describe('flashPartition', () => {
     queue.push(response(ResponseType.EndSession)) // endSession
 
     vi.useFakeTimers()
-    const flash = device.flashPartition(entry!.partitionName, new Uint8Array(16))
+    const flash = device.flashPartition(entry!.partitionName, new Blob([new Uint8Array(16)]))
     await vi.runAllTimersAsync()
     await flash
 
@@ -712,7 +714,7 @@ describe('flashPartition', () => {
     queue.push(response(ResponseType.FileTransfer)) // end ack
     queue.push(response(ResponseType.EndSession)) // endSession
 
-    await device.flashPartition(entry.partitionName, new Uint8Array(16))
+    await device.flashPartition(entry.partitionName, new Blob([new Uint8Array(16)]))
 
     // no PitFile dump was sent: the first packet is the TotalBytes request
     expect(sent.every((packet) => readUint32LE(packet, 0) !== 0x65)).toBe(true)
@@ -730,7 +732,7 @@ describe('flashPartition', () => {
     device._devicePit = pit
     device._flashSessionStarted = true
 
-    await expect(device.flashPartition('nope', new Uint8Array(4))).rejects.toThrow(
+    await expect(device.flashPartition('nope', new Blob([new Uint8Array(4)]))).rejects.toThrow(
       'does not have a partition named nope'
     )
   })
@@ -754,7 +756,7 @@ describe('flashPartition', () => {
     queue.push(response(ResponseType.FileTransfer)) // end ack
     queue.push(response(ResponseType.EndSession)) // endSession
 
-    await device.flashPartition(entry.partitionName, buildLz4Frame(100000, [100000]))
+    await device.flashPartition(entry.partitionName, new Blob([buildLz4Frame(100000, [100000])]))
 
     // the file transfer request is Lz4Flash (5), proving the LZ4 path ran
     const transferPacket = sent.find((packet) => readUint32LE(packet, 0) === 0x66)!
@@ -800,7 +802,7 @@ describe('flashPit', () => {
     expect(device._devicePit).toBeUndefined()
   })
 
-  test('sends raw bytes verbatim when given a Uint8Array', async () => {
+  test('sends raw bytes verbatim when given a Blob', async () => {
     const { transport, sent, queue } = createFakeTransport()
     const device = new OdinDevice(transport)
     device._flashSessionStarted = true // skip the begin-session delay
@@ -813,7 +815,7 @@ describe('flashPit', () => {
     queue.push(response(ResponseType.PitFile)) // end transfer
     queue.push(response(ResponseType.EndSession)) // endSession
 
-    await device.flashPit(pitBytes)
+    await device.flashPit(new Blob([pitBytes]))
 
     expect(readUint32LE(sent[2]!, 8)).toBe(pitBytes.byteLength) // FlashPart size
     expect(sent[4]!.byteLength).toBe(pitBytes.byteLength) // raw data length

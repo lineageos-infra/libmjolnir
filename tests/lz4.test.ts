@@ -164,43 +164,52 @@ describe('decompressLz4Sequence', () => {
 })
 
 describe('lz4Sequences', () => {
-  test('yields one sequence when everything fits', () => {
+  test('yields one sequence when everything fits', async () => {
     const frame = buildFrame(100000, [10, 20])
     const header = parseLz4FrameHeader(frame)
 
-    const sequences = Array.from(lz4Sequences(frame, header, 1024 * 1024))
+    const sequences = await Array.fromAsync(
+      lz4Sequences(new Blob([new Uint8Array(frame)]), header, 1024 * 1024)
+    )
 
     expect(sequences).toHaveLength(1)
     expect(sequences[0]!.decompressedSize).toBe(100000)
-    expect(sequences[0]!.data).toHaveLength(4 + 10 + 4 + 20)
-    expect(sequences[0]!.data[0]).toBe(10)
+
+    const bytes = new Uint8Array(await sequences[0]!.data.arrayBuffer())
+
+    expect(bytes.length).toBe(4 + 10 + 4 + 20)
+    expect(bytes[0]).toBe(10)
   })
 
-  test('splits blocks across sequences by decompressed size', () => {
+  test('splits blocks across sequences by decompressed size', async () => {
     const frame = buildFrame(100000, [10, 20])
     const header = parseLz4FrameHeader(frame)
 
-    const sequences = Array.from(lz4Sequences(frame, header, 64 * 1024))
+    const sequences = await Array.fromAsync(
+      lz4Sequences(new Blob([new Uint8Array(frame)]), header, 64 * 1024)
+    )
 
     expect(sequences).toHaveLength(2)
     expect(sequences[0]!.decompressedSize).toBe(64 * 1024)
-    expect(sequences[0]!.data).toHaveLength(4 + 10)
+    expect(sequences[0]!.data.size).toBe(4 + 10)
     expect(sequences[1]!.decompressedSize).toBe(100000 - 64 * 1024)
-    expect(sequences[1]!.data).toHaveLength(4 + 20)
+    expect(sequences[1]!.data.size).toBe(4 + 20)
   })
 
-  test('stops scanning when the frame ends without an end marker', () => {
+  test('stops scanning when the frame ends without an end marker', async () => {
     const full = buildFrame(100000, [10])
     const header = parseLz4FrameHeader(full)
     const frame = full.subarray(0, full.length - 4) // drop the EndMark
 
-    const sequences = Array.from(lz4Sequences(frame, header, 1024 * 1024))
+    const sequences = await Array.fromAsync(
+      lz4Sequences(new Blob([new Uint8Array(frame)]), header, 1024 * 1024)
+    )
 
     expect(sequences).toHaveLength(1)
-    expect(sequences[0]!.data).toHaveLength(4 + 10)
+    expect(sequences[0]!.data.size).toBe(4 + 10)
   })
 
-  test('clamps the final block to the available data', () => {
+  test('clamps the final block to the available data', async () => {
     // a block header claiming 10 data bytes, but only 5 follow
     const frame = new Uint8Array(15 + 4 + 5)
     const view = new DataView(frame.buffer)
@@ -213,9 +222,11 @@ describe('lz4Sequences', () => {
     view.setUint32(15, 0x80000000 | 10, true)
     const header = parseLz4FrameHeader(frame)
 
-    const sequences = Array.from(lz4Sequences(frame, header, 1024 * 1024))
+    const sequences = await Array.fromAsync(
+      lz4Sequences(new Blob([new Uint8Array(frame)]), header, 1024 * 1024)
+    )
 
     expect(sequences).toHaveLength(1)
-    expect(sequences[0]!.data).toHaveLength(frame.length - header.headerLength)
+    expect(sequences[0]!.data.size).toBe(frame.length - header.headerLength)
   })
 })

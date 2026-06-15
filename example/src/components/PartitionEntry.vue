@@ -19,7 +19,7 @@
 
     emit('flash', {
       name: partitionName,
-      data: new Uint8Array(await currentFile.value.arrayBuffer())
+      data: currentFile.value
     });
   }
 </script>

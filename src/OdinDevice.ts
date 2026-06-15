@@ -284,7 +284,7 @@ export class OdinDevice {
    * Flash (upload) a PIT partition table to the device, repartitioning it.
    * @param pit - a PitData instance, or raw .pit file bytes
    */
-  async flashPit(pit: PitData | Uint8Array) {
+  async flashPit(pit: PitData | Blob) {
     await this.beginSession()
 
     let pitBytes: Uint8Array
@@ -292,7 +292,7 @@ export class OdinDevice {
       pitBytes = new Uint8Array(pit.getDataSize())
       pit.pack(pitBytes)
     } else {
-      pitBytes = pit
+      pitBytes = new Uint8Array(await pit.arrayBuffer())
     }
     const fileSize = pitBytes.byteLength
 
@@ -317,9 +317,9 @@ export class OdinDevice {
   /**
    * Flash a file to the specified partition
    * @param {string} partitionName - the name of the partition to be flashed
-   * @param {Uint8Array} fileData - the data to flash to the partition
+   * @param {Blob} fileData - the data to flash to the partition
    */
-  async flashPartition(partitionName: string, fileData: Uint8Array) {
+  async flashPartition(partitionName: string, fileData: Blob) {
     await this.beginSession()
 
     if (!this._devicePit) {
@@ -332,12 +332,14 @@ export class OdinDevice {
       throw new Error(`flashPartition: device PIT does not have a partition named ${partitionName}`)
     }
 
-    if (isLz4Frame(fileData)) {
-      const lz4Header = parseLz4FrameHeader(fileData)
+    const header = new Uint8Array(await fileData.slice(0, 32).arrayBuffer())
+
+    if (isLz4Frame(header)) {
+      const lz4Header = parseLz4FrameHeader(header)
       await this.setFlashTotalSize(lz4Header.contentSize)
       await this.sendLz4File(fileData, entry.binaryType, entry.deviceType, entry.identifier)
     } else {
-      await this.setFlashTotalSize(fileData.byteLength)
+      await this.setFlashTotalSize(fileData.size)
       await this.sendFile(fileData, entry.binaryType, entry.deviceType, entry.identifier)
     }
 
@@ -354,13 +356,13 @@ export class OdinDevice {
 
   /**
    * Flash a file to a device
-   * @param fileData - a byte array of the file's contents
+   * @param fileData - a Blob containing the file's contents
    * @param binaryType - the partition's "binaryType" (AP or CP)
    * @param deviceType - the partition's "deviceType"
    * @param fileIdentifier - the partition ID you wish to flash to
    */
   async sendFile(
-    fileData: Uint8Array,
+    fileData: Blob,
     binaryType: EntryBinaryType,
     deviceType: number,
     fileIdentifier: number
@@ -368,7 +370,7 @@ export class OdinDevice {
     await this.sendPacket(new FileTransferPacket(FileTransferRequest.Flash))
     await this.receivePacket(FileTransferResponse)
 
-    const fileSize = fileData.length
+    const fileSize = fileData.size
     const maxSequenceByteCount = this._flashSequence * this._flashPacketSize
     const sequenceCount = Math.ceil(fileSize / maxSequenceByteCount)
 
@@ -376,7 +378,7 @@ export class OdinDevice {
       this._log('info', `sending sequence ${sequenceIndex + 1} of ${sequenceCount}`)
 
       const startOffset = sequenceIndex * maxSequenceByteCount
-      const sequenceData = fileData.subarray(
+      const sequenceData = fileData.slice(
         startOffset,
         Math.min(startOffset + maxSequenceByteCount, fileSize)
       )
@@ -384,7 +386,7 @@ export class OdinDevice {
 
       await this._sendFileSequence(
         sequenceData,
-        sequenceData.length,
+        sequenceData.size,
         binaryType,
         deviceType,
         fileIdentifier,
@@ -397,18 +399,19 @@ export class OdinDevice {
   /**
    * Flash an LZ4-compressed file to a device. If the device does not support
    * LZ4, the file is decompressed on the host and flashed uncompressed.
-   * @param fileData - a byte array of the LZ4 frame's contents
+   * @param fileData - a Blob containing the LZ4 frame's contents
    * @param binaryType - the partition's "binaryType" (AP or CP)
    * @param deviceType - the partition's "deviceType"
    * @param fileIdentifier - the partition ID you wish to flash to
    */
   async sendLz4File(
-    fileData: Uint8Array,
+    fileData: Blob,
     binaryType: EntryBinaryType,
     deviceType: number,
     fileIdentifier: number
   ) {
-    const lz4Header = parseLz4FrameHeader(fileData)
+    const header = new Uint8Array(await fileData.slice(0, 32).arrayBuffer())
+    const lz4Header = parseLz4FrameHeader(header)
     const lz4 = this._lz4Supported
 
     await this.sendPacket(
@@ -416,7 +419,7 @@ export class OdinDevice {
     )
     await this.receivePacket(FileTransferResponse)
 
-    const sequences = Array.from(
+    const sequences = await Array.fromAsync(
       lz4Sequences(fileData, lz4Header, this._flashSequence * this._flashPacketSize)
     )
 
@@ -428,11 +431,15 @@ export class OdinDevice {
       const isLastSequence = sequenceIndex === sequences.length - 1
 
       if (!lz4) {
-        data = decompressLz4Sequence(data, lz4Header.blockMaxSize)
+        data = new Blob([
+          new Uint8Array(
+            decompressLz4Sequence(new Uint8Array(await data.arrayBuffer()), lz4Header.blockMaxSize)
+          )
+        ])
 
-        if (data.length !== decompressedSize) {
+        if (data.size !== decompressedSize) {
           throw new Error(
-            `Expected decompressed sequence size: ${decompressedSize} Received: ${data.length}`
+            `Expected decompressed sequence size: ${decompressedSize} Received: ${data.size}`
           )
         }
       }
@@ -450,7 +457,7 @@ export class OdinDevice {
   }
 
   async _sendFileSequence(
-    sequenceData: Uint8Array,
+    sequenceData: Blob,
     endByteCount: number,
     binaryType: EntryBinaryType,
     deviceType: number,
@@ -459,19 +466,21 @@ export class OdinDevice {
     lz4: boolean
   ) {
     await this.sendPacket(
-      new FlashPartFileTransferPacket(sequenceData.length, lz4),
+      new FlashPartFileTransferPacket(sequenceData.size, lz4),
       undefined,
       this._flashTimeout
     )
     await this.receivePacket(FileTransferResponse, this._flashTimeout)
 
-    const partCount = Math.ceil(sequenceData.length / this._flashPacketSize)
+    const partCount = Math.ceil(sequenceData.size / this._flashPacketSize)
 
     for (let filePartIndex = 0; filePartIndex < partCount; filePartIndex++) {
       this._log('info', `sending part ${filePartIndex + 1} of ${partCount}`)
 
       const startOffset = filePartIndex * this._flashPacketSize
-      const partData = sequenceData.slice(startOffset, startOffset + this._flashPacketSize)
+      const partData = new Uint8Array(
+        await sequenceData.slice(startOffset, startOffset + this._flashPacketSize).arrayBuffer()
+      )
 
       await this.sendPacket(
         new SendFilePartPacket(partData, this._flashPacketSize),
