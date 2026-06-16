@@ -18,12 +18,13 @@ export const ByteArray = {
   },
 
   /**
-   * Decodes a provided byte array into a string, ignoring any `0x00`'s
+   * Decodes a provided null-terminated string byte array into a string
    * @param byteData - the provided byte array
    */
   toString(byteData: Uint8Array) {
+    const end = byteData.indexOf(0)
     return byteData
-      .filter((code) => code !== 0)
+      .slice(0, end === -1 ? byteData.length : end)
       .reduce((prev, current) => `${prev}${String.fromCharCode(current)}`, '')
   }
 }
