@@ -141,7 +141,7 @@ describe('WebUsbTransport.receive', () => {
 
   test('throws on a non-ok transfer status', async () => {
     const device = createFakeUsbDevice()
-    device.transferIn.mockResolvedValueOnce({ status: 'stall', data: null })
+    device.transferIn.mockResolvedValueOnce({ status: 'stall', data: undefined })
     const transport = new WebUsbTransport(device as unknown as USBDevice)
 
     await expect(transport.receive(4, 1000)).rejects.toThrow()

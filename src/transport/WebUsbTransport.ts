@@ -111,7 +111,7 @@ export class WebUsbTransport implements OdinTransport {
         this._orphanedReceive = orphan
         throw error
       }
-      if (result.data != null && result.data.byteLength > 0) {
+      if (result.data != undefined && result.data.byteLength > 0) {
         return toBytes(result)
       }
       // the empty receive arrived late; discard it and receive normally
@@ -155,7 +155,7 @@ export class WebUsbTransport implements OdinTransport {
 }
 
 function toBytes(result: USBInTransferResult): Uint8Array<ArrayBuffer> {
-  if (result.data == null || result.status !== 'ok') {
+  if (result.data == undefined || result.status !== 'ok') {
     throw new Error(`receive failed with status ${result.status}`)
   }
   const view = result.data

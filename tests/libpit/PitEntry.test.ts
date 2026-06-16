@@ -30,8 +30,8 @@ describe('matches', () => {
     expect(sampleEntry().matches(other)).toBe(false)
   })
 
-  test('returns false for a null counterpart', () => {
-    expect(sampleEntry().matches(null as unknown as PitEntry)).toBe(false)
+  test('returns false for an undefined counterpart', () => {
+    expect(sampleEntry().matches(undefined as unknown as PitEntry)).toBe(false)
   })
 })
 
