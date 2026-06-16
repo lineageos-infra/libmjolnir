@@ -1,27 +1,27 @@
 <script setup lang="ts">
-  import { ref } from 'vue';
-  import { libpit } from 'libmjolnir';
+import { libpit } from 'libmjolnir'
+import { ref } from 'vue'
 
-  defineProps<{ entry: libpit.PitEntry }>();
+defineProps<{ entry: libpit.PitEntry }>()
 
-  const emit = defineEmits(['flash']);
+const emit = defineEmits(['flash'])
 
-  const currentFile = ref<File>();
+const currentFile = ref<File>()
 
-  function stageFile (event: Event) {
-    currentFile.value = (event.target as HTMLInputElement).files?.[0];
+function stageFile(event: Event) {
+  currentFile.value = (event.target as HTMLInputElement).files?.[0]
+}
+
+function flashPartition(partitionName: string) {
+  if (!currentFile.value) {
+    return
   }
 
-  async function flashPartition (partitionName: string) {
-    if (!currentFile.value) {
-      return;
-    }
-
-    emit('flash', {
-      name: partitionName,
-      data: currentFile.value
-    });
-  }
+  emit('flash', {
+    name: partitionName,
+    data: currentFile.value
+  })
+}
 </script>
 
 <template>
@@ -34,11 +34,8 @@
     <td>{{ entry.blockSizeOrOffset }}</td>
     <td>
       <div v-if="entry.isFlashable" class="flash-cell">
-        <input type="file" :id="`flash-${entry.identifier}`" @change="stageFile"/>
-        <button
-          :disabled="!currentFile"
-          @click="flashPartition(entry.partitionName)"
-        >
+        <input :id="`flash-${entry.identifier}`" type="file" @change="stageFile" />
+        <button :disabled="!currentFile" @click="flashPartition(entry.partitionName)">
           Flash partition
         </button>
       </div>

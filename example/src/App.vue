@@ -1,84 +1,83 @@
 <script setup lang="ts">
-  import { ref } from 'vue';
-  import libmjolnir, { OdinDevice, libpit } from 'libmjolnir';
-  import { version as libmjolnirVersion } from 'libmjolnir/package.json';
+import libmjolnir, { libpit, OdinDevice } from 'libmjolnir'
+import { version as libmjolnirVersion } from 'libmjolnir/package.json'
+import { ref } from 'vue'
+import PartitionEntry from './components/PartitionEntry.vue'
 
-  import PartitionEntry from './components/PartitionEntry.vue';
+const devicePit = ref<libpit.PitData>()
+const connectedDevice = ref<OdinDevice>()
+const lz4Supported = ref(false)
 
-  const devicePit = ref<libpit.PitData>();
-  const connectedDevice = ref<OdinDevice>();
-  const lz4Supported = ref(false);
+const verboseLogging = ref(true)
+const defaultTimeout = ref(15000)
+const resetOnInit = ref(false)
 
-  const verboseLogging = ref(true);
-  const defaultTimeout = ref(15000);
-  const resetOnInit = ref(false);
+async function readPit(device: OdinDevice) {
+  await device.beginSession()
+  lz4Supported.value = device.lz4Supported
+  devicePit.value = await device.getPitData()
+  await device.endSession()
+}
 
-  async function readPit (device: OdinDevice) {
-    await device.beginSession();
-    lz4Supported.value = device.lz4Supported;
-    devicePit.value = await device.getPitData();
-    await device.endSession();
+async function setupDevice(device: OdinDevice) {
+  console.log(device.usbDevice)
+  await device.initialize()
+
+  connectedDevice.value = device
+
+  device.onDisconnect(() => {
+    connectedDevice.value = undefined
+    devicePit.value = undefined
+    console.log('device was disconnected')
+  })
+
+  await readPit(device)
+}
+
+function deviceOptions() {
+  return {
+    logging: verboseLogging.value,
+    timeout: defaultTimeout.value,
+    resetOnInit: resetOnInit.value
+  }
+}
+
+async function requestDeviceAccess() {
+  await libmjolnir.requestDevice(deviceOptions()).then(setupDevice)
+}
+
+async function requestSerialDeviceAccess() {
+  await libmjolnir.requestSerialDevice(deviceOptions()).then(setupDevice)
+}
+
+async function refreshPit() {
+  if (connectedDevice.value) {
+    await readPit(connectedDevice.value)
+  }
+}
+
+async function rebootDevice() {
+  await connectedDevice.value?.reboot()
+}
+
+async function flashPartition(data: { name: string; data: Blob }) {
+  await connectedDevice.value?.flashPartition(data.name, data.data)
+}
+
+const pitFile = ref<File>()
+
+function stagePitFile(event: Event) {
+  pitFile.value = (event.target as HTMLInputElement).files?.[0]
+}
+
+async function flashPit() {
+  if (!connectedDevice.value || !pitFile.value) {
+    return
   }
 
-  async function setupDevice (device: OdinDevice) {
-    console.log(device.usbDevice);
-    await device.initialize();
-
-    connectedDevice.value = device;
-
-    device.onDisconnect(() => {
-      connectedDevice.value = undefined;
-      devicePit.value = undefined;
-      console.log('device was disconnected')
-    });
-
-    await readPit(device);
-  }
-
-  function deviceOptions () {
-    return {
-      logging: verboseLogging.value,
-      timeout: defaultTimeout.value,
-      resetOnInit: resetOnInit.value
-    };
-  }
-
-  function requestDeviceAccess () {
-    libmjolnir.requestDevice(deviceOptions()).then(setupDevice);
-  }
-
-  function requestSerialDeviceAccess () {
-    libmjolnir.requestSerialDevice(deviceOptions()).then(setupDevice);
-  }
-
-  function refreshPit () {
-    if (connectedDevice.value) {
-      readPit(connectedDevice.value);
-    }
-  }
-
-  function rebootDevice () {
-    connectedDevice.value?.reboot();
-  }
-
-  async function flashPartition (data: {name: string, data: Blob}) {
-    await connectedDevice.value?.flashPartition(data.name, data.data);
-  }
-
-  const pitFile = ref<File>();
-
-  function stagePitFile (event: Event) {
-    pitFile.value = (event.target as HTMLInputElement).files?.[0];
-  }
-
-  async function flashPit () {
-    if (!connectedDevice.value || !pitFile.value) {
-      return;
-    }
-
-    await connectedDevice.value.flashPit(pitFile.value);
-    await readPit(connectedDevice.value);
-  }
+  await connectedDevice.value.flashPit(pitFile.value)
+  await readPit(connectedDevice.value)
+}
 </script>
 
 <template>
@@ -90,15 +89,15 @@
     <legend>Connection options</legend>
     <div>
       <label>Verbose logging: </label>
-      <input type="checkbox" v-model="verboseLogging" />
+      <input v-model="verboseLogging" type="checkbox" />
     </div>
     <div>
       <label>Packet timeout: </label>
-      <input type="number" v-model="defaultTimeout" />
+      <input v-model="defaultTimeout" type="number" />
     </div>
     <div>
       <label>Reset on initialize: </label>
-      <input type="checkbox" v-model="resetOnInit" />
+      <input v-model="resetOnInit" type="checkbox" />
     </div>
   </fieldset>
   <div class="connect-buttons">
@@ -148,145 +147,145 @@
 </template>
 
 <style>
-  :root {
-    color-scheme: light dark;
-    --border: color-mix(in srgb, currentColor 20%, transparent);
-    --surface: color-mix(in srgb, currentColor 7%, transparent);
-  }
+:root {
+  color-scheme: light dark;
+  --border: color-mix(in srgb, currentColor 20%, transparent);
+  --surface: color-mix(in srgb, currentColor 7%, transparent);
+}
 
-  body {
-    font-family: system-ui, sans-serif;
-    max-width: 64rem;
-    margin: 0 auto;
-    padding: 1.5rem;
-    line-height: 1.5;
-  }
+body {
+  font-family: system-ui, sans-serif;
+  max-width: 64rem;
+  margin: 0 auto;
+  padding: 1.5rem;
+  line-height: 1.5;
+}
 
-  h1 {
-    font-size: 1.5rem;
-    margin-bottom: 0.25rem;
-  }
+h1 {
+  font-size: 1.5rem;
+  margin-bottom: 0.25rem;
+}
 
-  button,
-  input[type='file']::file-selector-button {
-    padding: 0.3rem 0.8rem;
-    border: 1px solid var(--border);
-    border-radius: 0.375rem;
-    background-color: var(--surface);
-    font: inherit;
-    font-size: 0.9rem;
-    cursor: pointer;
-  }
+button,
+input[type='file']::file-selector-button {
+  padding: 0.3rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 0.375rem;
+  background-color: var(--surface);
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
 
-  button:enabled:hover,
-  input[type='file']::file-selector-button:hover {
-    background-color: color-mix(in srgb, currentColor 14%, transparent);
-  }
+button:enabled:hover,
+input[type='file']::file-selector-button:hover {
+  background-color: color-mix(in srgb, currentColor 14%, transparent);
+}
 
-  button:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
-  input[type='number'] {
-    padding: 0.2rem 0.5rem;
-    border: 1px solid var(--border);
-    border-radius: 0.375rem;
-    font: inherit;
-    font-size: 0.9rem;
-  }
+input[type='number'] {
+  padding: 0.2rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 0.375rem;
+  font: inherit;
+  font-size: 0.9rem;
+}
 
-  input[type='file'] {
-    font-size: 0.85rem;
-  }
+input[type='file'] {
+  font-size: 0.85rem;
+}
 
-  input[type='file']::file-selector-button {
-    margin-right: 0.625rem;
-  }
+input[type='file']::file-selector-button {
+  margin-right: 0.625rem;
+}
 
-  .connect-buttons {
-    display: flex;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-  }
+.connect-buttons {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
 
-  .connection-options {
-    display: flex;
-    flex-direction: column;
-    gap: 0.375rem;
-    width: fit-content;
-    margin-bottom: 1rem;
-    padding: 0.75rem 1rem;
-    border: 1px solid var(--border);
-    border-radius: 0.5rem;
-  }
+.connection-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  width: fit-content;
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+}
 
-  .device-info {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    margin-top: 2rem;
-  }
+.device-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 2rem;
+}
 
-  .badge {
-    border-radius: 1rem;
-    padding: 0.15rem 0.7rem;
-    font-size: 0.8rem;
-    font-weight: 500;
-    background-color: var(--surface);
-    opacity: 0.8;
-  }
+.badge {
+  border-radius: 1rem;
+  padding: 0.15rem 0.7rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  background-color: var(--surface);
+  opacity: 0.8;
+}
 
-  .badge.supported {
-    color: light-dark(#15803d, #4ade80);
-    background-color: color-mix(in srgb, currentColor 12%, transparent);
-    opacity: 1;
-  }
+.badge.supported {
+  color: light-dark(#15803d, #4ade80);
+  background-color: color-mix(in srgb, currentColor 12%, transparent);
+  opacity: 1;
+}
 
-  .flash-pit {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin-top: 1rem;
-  }
+.flash-pit {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
 
-  .hint {
-    font-size: 0.85rem;
-    opacity: 0.6;
-    margin: 0.5rem 0 1rem;
-  }
+.hint {
+  font-size: 0.85rem;
+  opacity: 0.6;
+  margin: 0.5rem 0 1rem;
+}
 
-  .pit-table {
-    border-collapse: collapse;
-    width: 100%;
-    font-size: 0.9rem;
-  }
+.pit-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.9rem;
+}
 
-  .pit-table th,
-  .pit-table td {
-    padding: 0.5rem 0.75rem;
-    text-align: left;
-  }
+.pit-table th,
+.pit-table td {
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+}
 
-  .pit-table th {
-    font-size: 0.75rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    opacity: 0.6;
-    border-bottom: 2px solid var(--border);
-  }
+.pit-table th {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.6;
+  border-bottom: 2px solid var(--border);
+}
 
-  .pit-table td {
-    border-bottom: 1px solid var(--border);
-  }
+.pit-table td {
+  border-bottom: 1px solid var(--border);
+}
 
-  .pit-table tbody tr:hover {
-    background-color: var(--surface);
-  }
+.pit-table tbody tr:hover {
+  background-color: var(--surface);
+}
 
-  .flash-cell {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
+.flash-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
 </style>
