@@ -82,6 +82,13 @@ export class PitEntry {
     this._partitionName.set(ByteArray.fromString(desiredName))
   }
 
+  get partitionSize() {
+    if (this.deviceType === EntryDeviceType.UFS) {
+      return this.blockCount * 4096
+    }
+    return this.blockCount * 512
+  }
+
   get flashFilename() {
     return ByteArray.toString(this._flashFilename)
   }

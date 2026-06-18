@@ -47,6 +47,24 @@ describe('isFlashable', () => {
   })
 })
 
+describe('partitionSize', () => {
+  test('is 102400 for MMC', () => {
+    const entry = new PitEntry()
+    entry.deviceType = EntryDeviceType.MMC
+    entry.blockCount = 200
+
+    expect(entry.partitionSize).toBe(102400)
+  })
+
+  test('is 819200 for UFS', () => {
+    const entry = new PitEntry()
+    entry.deviceType = EntryDeviceType.UFS
+    entry.blockCount = 200
+
+    expect(entry.partitionSize).toBe(819200)
+  })
+})
+
 describe('name accessors', () => {
   test('partitionName, flashFilename and fotaFilename round-trip', () => {
     const entry = new PitEntry()
