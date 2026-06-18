@@ -1,10 +1,10 @@
 import { describe, expect, test } from 'vitest'
-import { PitEntry } from '../../src/libpit/PitEntry'
+import { EntryBinaryType, EntryDeviceType, PitEntry } from '../../src/libpit/PitEntry'
 
 function sampleEntry() {
   const entry = new PitEntry()
-  entry.binaryType = 0
-  entry.deviceType = 2
+  entry.binaryType = EntryBinaryType.ApplicationProcessor
+  entry.deviceType = EntryDeviceType.MMC
   entry.identifier = 5
   entry.blockSizeOrOffset = 100
   entry.blockCount = 200
