@@ -296,22 +296,27 @@ export class OdinDevice {
     }
     const fileSize = pitBytes.byteLength
 
-    await this.sendPacket(new PitFilePacket(PitFileRequest.Flash))
-    await this.receivePacket(PitFileResponse)
+    let succeeded = false
+    try {
+      await this.sendPacket(new PitFilePacket(PitFileRequest.Flash))
+      await this.receivePacket(PitFileResponse)
 
-    await this.sendPacket(new FlashPartPitFilePacket(fileSize))
-    await this.receivePacket(PitFileResponse)
+      await this.sendPacket(new FlashPartPitFilePacket(fileSize))
+      await this.receivePacket(PitFileResponse)
 
-    await this.sendPacket(new SendFilePartPacket(pitBytes, fileSize))
-    await this.receivePacket(PitFileResponse)
+      await this.sendPacket(new SendFilePartPacket(pitBytes, fileSize))
+      await this.receivePacket(PitFileResponse)
 
-    await this.sendPacket(new EndPitFileTransferPacket(fileSize))
-    await this.receivePacket(PitFileResponse)
-
-    await this.endSession()
-
-    // the device PIT changed; drop the stale cache
-    delete this._devicePit
+      await this.sendPacket(new EndPitFileTransferPacket(fileSize))
+      await this.receivePacket(PitFileResponse)
+      succeeded = true
+    } finally {
+      // the device PIT is now stale (or half-written on error); drop the cache
+      // and tear down the session so a retry starts clean. A teardown failure
+      // must not mask a mid-flash error.
+      delete this._devicePit
+      await (succeeded ? this.endSession() : this.endSession().catch(() => {}))
+    }
   }
 
   /**
@@ -334,16 +339,22 @@ export class OdinDevice {
 
     const header = new Uint8Array(await fileData.slice(0, 32).arrayBuffer())
 
-    if (isLz4Frame(header)) {
-      const lz4Header = parseLz4FrameHeader(header)
-      await this.setFlashTotalSize(lz4Header.contentSize)
-      await this.sendLz4File(fileData, entry.binaryType, entry.deviceType, entry.identifier)
-    } else {
-      await this.setFlashTotalSize(fileData.size)
-      await this.sendFile(fileData, entry.binaryType, entry.deviceType, entry.identifier)
+    let succeeded = false
+    try {
+      if (isLz4Frame(header)) {
+        const lz4Header = parseLz4FrameHeader(header)
+        await this.setFlashTotalSize(lz4Header.contentSize)
+        await this.sendLz4File(fileData, entry.binaryType, entry.deviceType, entry.identifier)
+      } else {
+        await this.setFlashTotalSize(fileData.size)
+        await this.sendFile(fileData, entry.binaryType, entry.deviceType, entry.identifier)
+      }
+      succeeded = true
+    } finally {
+      // tear down the session even on a mid-flash error so a retry starts clean;
+      // a teardown failure must not mask the original error
+      await (succeeded ? this.endSession() : this.endSession().catch(() => {}))
     }
-
-    await this.endSession()
   }
 
   /**

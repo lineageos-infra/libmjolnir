@@ -33,21 +33,16 @@ export class PitData {
 
   getPaddedSize() {
     const dataSize = this.getDataSize()
-    let paddedSize =
-      (dataSize / constants.PaddedSizeMultiplicand) * constants.PaddedSizeMultiplicand
-
-    if (dataSize % constants.PaddedSizeMultiplicand !== 0)
-      paddedSize += constants.PaddedSizeMultiplicand
-
-    return paddedSize
+    return Math.ceil(dataSize / constants.PaddedSizeMultiplicand) * constants.PaddedSizeMultiplicand
   }
 
   unpackInteger(data: Uint8Array, offset: number) {
     return (
-      data[offset]! |
-      (data[offset + 1]! << 8) |
-      (data[offset + 2]! << 16) |
-      (data[offset + 3]! << 24)
+      (data[offset]! |
+        (data[offset + 1]! << 8) |
+        (data[offset + 2]! << 16) |
+        (data[offset + 3]! << 24)) >>>
+      0
     )
   }
 
@@ -84,6 +79,12 @@ export class PitData {
     this.entries = []
 
     this.entryCount = this.unpackInteger(data, 4)
+
+    // reject a count the buffer can't actually hold before allocating/looping
+    const requiredSize = constants.HeaderDataSize + this.entryCount * constants.EntryDataSize
+    if (requiredSize > data.length) {
+      return false
+    }
 
     this.entries = new Array<PitEntry>(this.entryCount)
 
@@ -178,7 +179,7 @@ export class PitData {
   }
 
   set fileType(desiredType: string) {
-    this._fileType.set(ByteArray.fromString(desiredType))
+    this._fileType = ByteArray.fromString(desiredType, this._fileType.length)
   }
 
   get boardType() {
@@ -186,7 +187,7 @@ export class PitData {
   }
 
   set boardType(desiredName: string) {
-    this._boardType.set(ByteArray.fromString(desiredName))
+    this._boardType = ByteArray.fromString(desiredName, this._boardType.length)
   }
 
   getEntry(index: number): PitEntry {

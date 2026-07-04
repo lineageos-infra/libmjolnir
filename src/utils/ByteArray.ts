@@ -5,15 +5,12 @@ export const ByteArray = {
    * @param length - the size to make the byte array
    */
   fromString(message: string, length?: number) {
-    if (length && message.length > length) {
-      message = message.slice(0, length)
-    }
+    const encoded = new TextEncoder().encode(message)
+    const size = length ?? encoded.byteLength
 
-    const buffer = new ArrayBuffer(length || message.length)
-    const encoder = new TextEncoder()
-
-    const byteArray = new Uint8Array(buffer)
-    byteArray.set(encoder.encode(message))
+    const byteArray = new Uint8Array(size)
+    // truncate on encoded bytes, never overflow the destination
+    byteArray.set(encoded.subarray(0, size))
     return byteArray
   },
 
@@ -23,8 +20,7 @@ export const ByteArray = {
    */
   toString(byteData: Uint8Array) {
     const end = byteData.indexOf(0)
-    return byteData
-      .slice(0, end === -1 ? byteData.length : end)
-      .reduce((prev, current) => `${prev}${String.fromCharCode(current)}`, '')
+    const slice = byteData.subarray(0, end === -1 ? byteData.length : end)
+    return new TextDecoder().decode(slice)
   }
 }

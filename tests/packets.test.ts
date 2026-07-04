@@ -36,6 +36,14 @@ describe('BeginSessionPacket', () => {
   })
 })
 
+describe('InboundPacket', () => {
+  test('unpackInteger decodes a high-bit value as unsigned', () => {
+    const packet = new InboundPacket(8)
+    packet.data.set([0x00, 0x00, 0x00, 0x80], 0) // 0x80000000 LE
+    expect(packet.unpackInteger(0)).toBe(0x80000000)
+  })
+})
+
 describe('TotalBytesPacket', () => {
   test('packs a small size with a zero upper dword', () => {
     const packet = new TotalBytesPacket(0x12345678)

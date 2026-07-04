@@ -91,6 +91,10 @@ export function decompressLz4Block(src: Uint8Array, maxDecompressedSize: number)
       } while (lengthByte === 255)
     }
 
+    if (dstIndex + literalLength > dst.length) {
+      throw new Error('LZ4 block exceeds max decompressed size')
+    }
+
     dst.set(src.subarray(srcIndex, srcIndex + literalLength), dstIndex)
     srcIndex += literalLength
     dstIndex += literalLength
@@ -113,6 +117,10 @@ export function decompressLz4Block(src: Uint8Array, maxDecompressedSize: number)
         lengthByte = src[srcIndex++]!
         matchLength += lengthByte
       } while (lengthByte === 255)
+    }
+
+    if (dstIndex + matchLength > dst.length) {
+      throw new Error('LZ4 block exceeds max decompressed size')
     }
 
     let matchIndex = dstIndex - offset

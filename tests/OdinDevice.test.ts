@@ -733,6 +733,31 @@ describe('flashPartition', () => {
     expect(readUint32LE(sent[0]!, 4)).toBe(2) // TotalBytes request
   })
 
+  test('clears the session flag when the flash throws mid-transfer', async () => {
+    const { transport, queue } = createFakeTransport()
+    const device = new OdinDevice(transport)
+    const pitBytes = readFixture(SAMPLE_PIT)
+
+    const pit = new PitData()
+    pit.unpack(pitBytes)
+    device._devicePit = pit
+    device._flashSessionStarted = true
+    const entry = pit.entries.find((candidate) => candidate.isFlashable)!
+
+    queue.push(response(ResponseType.SessionSetup, 0)) // setFlashTotalSize
+    queue.push(response(ResponseType.FileTransfer)) // sendFile Flash ack
+    queue.push(response(ResponseType.FileTransfer)) // FlashPart ack
+    queue.push(response(ResponseType.SendFilePart, 7)) // wrong index -> throws
+    queue.push(response(ResponseType.EndSession)) // endSession cleanup
+
+    await expect(
+      device.flashPartition(entry.partitionName, new Blob([new Uint8Array(16)]))
+    ).rejects.toThrow('Expected file part index')
+
+    // the session must not be left dangling for the next operation
+    expect(device._flashSessionStarted).toBe(false)
+  })
+
   test('throws when the partition is not in the PIT', async () => {
     const { transport } = createFakeTransport()
     const device = new OdinDevice(transport)
@@ -808,6 +833,25 @@ describe('flashPit', () => {
     expect(readUint32LE(sent[8]!, 0)).toBe(0x65)
     expect(readUint32LE(sent[8]!, 4)).toBe(3) // EndTransfer request
     expect(readUint32LE(sent[8]!, 8)).toBe(dataSize)
+
+    expect(device._flashSessionStarted).toBe(false)
+    expect(device._devicePit).toBeUndefined()
+  })
+
+  test('clears the session flag and stale PIT cache when the flash throws', async () => {
+    const { transport, queue } = createFakeTransport()
+    const device = new OdinDevice(transport)
+    device._flashSessionStarted = true // skip the begin-session delay
+    device._devicePit = new PitData()
+
+    const pit = new PitData()
+    pit.unpack(readFixture(SAMPLE_PIT))
+
+    queue.push(response(ResponseType.PitFile)) // Flash init
+    queue.push(new Uint8Array(4)) // wrong-size FlashPart response -> throws
+    queue.push(response(ResponseType.EndSession)) // endSession cleanup
+
+    await expect(device.flashPit(pit)).rejects.toThrow('incorrect size received')
 
     expect(device._flashSessionStarted).toBe(false)
     expect(device._devicePit).toBeUndefined()

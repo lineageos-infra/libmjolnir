@@ -76,4 +76,13 @@ describe('name accessors', () => {
     expect(entry.flashFilename).toBe('system.img')
     expect(entry.fotaFilename).toBe('fota.bin')
   })
+
+  test('truncates a name that is longer than its fixed field instead of overflowing', () => {
+    const entry = new PitEntry()
+    const longName = 'a'.repeat(40) // field is 32 bytes
+
+    expect(() => (entry.partitionName = longName)).not.toThrow()
+    expect(entry._partitionName).toHaveLength(32)
+    expect(entry.partitionName).toBe('a'.repeat(32))
+  })
 })

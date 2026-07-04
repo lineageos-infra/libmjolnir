@@ -138,6 +138,20 @@ describe('decompressLz4Block', () => {
 
     expect(Array.from(decompressLz4Block(block, 64))).toEqual(new Array(23).fill(0x55))
   })
+
+  test('throws when literals overflow the max decompressed size', () => {
+    // token 0x50 -> 5 literals, but the destination only holds 4 bytes
+    const block = new Uint8Array([0x50, 0x41, 0x42, 0x43, 0x44, 0x45])
+
+    expect(() => decompressLz4Block(block, 4)).toThrow('max decompressed size')
+  })
+
+  test('throws when a match overflows the max decompressed size', () => {
+    // 4 literals then a match of 4 back-referencing them -> 8 bytes into a 6-byte dst
+    const block = new Uint8Array([0x40, 0x61, 0x62, 0x63, 0x64, 0x04, 0x00])
+
+    expect(() => decompressLz4Block(block, 6)).toThrow('max decompressed size')
+  })
 })
 
 describe('decompressLz4Sequence', () => {

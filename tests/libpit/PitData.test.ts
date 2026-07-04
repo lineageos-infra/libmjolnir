@@ -71,10 +71,17 @@ describe('clear', () => {
 })
 
 describe('getPaddedSize', () => {
-  test('pads up when the data size is not a multiple of the boundary', () => {
+  test('rounds a sub-boundary data size up to a single boundary', () => {
     const data = new PitData() // no entries -> 28-byte header
     expect(data.getDataSize()).toBe(28)
-    expect(data.getPaddedSize()).toBe(28 + 4096)
+    expect(data.getPaddedSize()).toBe(4096)
+  })
+
+  test('rounds up to the next multiple, not one multiple past the data', () => {
+    const data = new PitData()
+    data.entries = new Array<PitEntry>(40) // 28 + 40 * 132 = 5308 -> ceil to 8192
+    expect(data.getDataSize()).toBe(5308)
+    expect(data.getPaddedSize()).toBe(8192)
   })
 
   test('leaves an exact multiple of the boundary unchanged', () => {
@@ -85,10 +92,28 @@ describe('getPaddedSize', () => {
   })
 })
 
+describe('unpackInteger', () => {
+  test('decodes a value with the high bit set as unsigned', () => {
+    const data = new PitData()
+    const bytes = new Uint8Array([0x00, 0x00, 0x00, 0x80]) // 0x80000000 LE
+    expect(data.unpackInteger(bytes, 0)).toBe(0x80000000)
+  })
+})
+
 describe('unpack', () => {
   test('returns false when the file identifier is wrong', () => {
     const data = new PitData()
     expect(data.unpack(new Uint8Array(64))).toBe(false)
+  })
+
+  test('returns false when the buffer is too small for the declared entry count', () => {
+    const data = new PitData()
+    const bytes = new Uint8Array(64)
+    const header = new DataView(bytes.buffer)
+    header.setUint32(0, 0x12349876, true) // valid file identifier
+    header.setUint32(4, 1000, true) // claims 1000 entries the buffer can't hold
+
+    expect(data.unpack(bytes)).toBe(false)
   })
 })
 

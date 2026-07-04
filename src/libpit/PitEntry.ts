@@ -79,7 +79,7 @@ export class PitEntry {
   }
 
   set partitionName(desiredName: string) {
-    this._partitionName.set(ByteArray.fromString(desiredName))
+    this._partitionName = ByteArray.fromString(desiredName, constants.PartitionNameMaxLength)
   }
 
   get partitionSize() {
@@ -94,7 +94,7 @@ export class PitEntry {
   }
 
   set flashFilename(desiredName: string) {
-    this._flashFilename.set(ByteArray.fromString(desiredName))
+    this._flashFilename = ByteArray.fromString(desiredName, constants.FlashFilenameMaxLength)
   }
 
   get fotaFilename() {
@@ -102,6 +102,6 @@ export class PitEntry {
   }
 
   set fotaFilename(desiredName: string) {
-    this._fotaFilename.set(ByteArray.fromString(desiredName))
+    this._fotaFilename = ByteArray.fromString(desiredName, constants.FotaFilenameMaxLength)
   }
 }
