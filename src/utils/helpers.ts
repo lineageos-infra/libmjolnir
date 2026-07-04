@@ -5,12 +5,13 @@
  * @param ms - the number of milliseconds to wait before reporting failure
  */
 export const timeoutPromise = <T>(promise: Promise<T>, reason: string, ms: number): Promise<T> => {
+  let timer: ReturnType<typeof setTimeout>
   return Promise.race([
     promise,
     new Promise<never>((_resolve, reject) => {
-      setTimeout(() => reject(new Error(reason)), ms)
+      timer = setTimeout(() => reject(new Error(reason)), ms)
     })
-  ])
+  ]).finally(() => clearTimeout(timer))
 }
 
 /**
