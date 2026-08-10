@@ -305,7 +305,31 @@ export class OdinDevice {
       await this.receivePacket(PitFileResponse)
 
       await this.sendPacket(new SendFilePartPacket(pitBytes, fileSize))
-      await this.receivePacket(PitFileResponse)
+      const sendFilePartResponse = await this.transport.receive(8, this.deviceOptions.timeout)
+
+      // The device may respond with either a PitFileResponse or a SendFilePartResponse.
+      // If it responds with neither, the PIT flash has failed.
+      if (
+        (
+          await Promise.all(
+            [PitFileResponse, SendFilePartResponse].map(async (T) => {
+              const packet = new T()
+              packet.data = sendFilePartResponse
+              packet.receivedSize = sendFilePartResponse.byteLength
+
+              try {
+                await packet.unpack()
+                this._log('debug', 'received packet', packet)
+                return true
+              } catch {
+                return false
+              }
+            })
+          )
+        ).every((result) => !result)
+      ) {
+        throw new Error('flashPit: failed to parse response data')
+      }
 
       await this.sendPacket(new EndPitFileTransferPacket(fileSize))
       await this.receivePacket(PitFileResponse)
